@@ -1,19 +1,16 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
-const cors = require("cors");
+const cors = require("cors")({ origin: "https://jottaaa12.github.io" });
 const axios = require("axios");
 const crypto = require("crypto");
 
 // Inicializa o Firebase Admin
 admin.initializeApp();
 
-// Configura o CORS para permitir requisições a partir de origens autorizadas
-const corsHandler = cors({ origin: true });
-
 // --- FUNÇÃO PARA CRIAR O PAGAMENTO ---
 exports.createPayment = onRequest((req, res) => {
-  corsHandler(req, res, async () => {
+  cors(req, res, async () => {
     if (req.method !== "POST") {
       return res.status(405).send("Método não permitido");
     }
@@ -131,7 +128,7 @@ exports.paymentWebhook = onRequest(async (req, res) => {
 
 // --- CHECAR STATUS DO PAGAMENTO ---
 exports.checkPaymentStatus = onRequest((req, res) => {
-  corsHandler(req, res, async () => {
+  cors(req, res, async () => {
     try {
       const { paymentId } = req.query;
       if (!paymentId) {
