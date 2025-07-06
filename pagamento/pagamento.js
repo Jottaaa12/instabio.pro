@@ -1,5 +1,5 @@
 // Configuração do Firebase
-const FIREBASE_FUNCTIONS_URL = 'SUA_URL_DO_FIREBASE_FUNCTIONS';
+const FIREBASE_FUNCTIONS_URL = "https://us-central1-webvendasonline-5a5eb.cloudfunctions.net";
 
 // Elementos do DOM
 const paymentForm = document.getElementById('payment-form');
