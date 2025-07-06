@@ -1,5 +1,5 @@
-const { onRequest } = require("firebase-functions/v2/https");
 const functions = require("firebase-functions");
+const { onRequest } = require("firebase-functions/v2/https");
 const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
@@ -9,16 +9,18 @@ const crypto = require("crypto");
 // Inicializa o Firebase Admin
 admin.initializeApp();
 
-// Cria a instância do Express
+// Cria o app Express
 const app = express();
 
-// Habilita CORS apenas para o domínio do GitHub Pages
+// Habilita CORS somente para o GitHub Pages
 app.use(cors({ origin: "https://jottaaa12.github.io" }));
 
-// Middleware para parsear JSON
+// Habilita JSON no body
 app.use(express.json());
 
-// ----------------- Rota: Criar Pagamento -----------------
+/* ---------------------- ROTAS ---------------------- */
+
+// Criar pagamento
 app.post("/create-payment", async (req, res) => {
   try {
     const mercadoPagoAccessToken = functions.config().mercadopago.token;
@@ -32,128 +34,102 @@ app.post("/create-payment", async (req, res) => {
       transaction_amount: 10.0,
       description: "Acesso Plano Spotify",
       payment_method_id: "pix",
-      payer: { email },
+      payer: { email }
     };
 
-    const mpResponse = await axios.post(
+    const mpRes = await axios.post(
       "https://api.mercadopago.com/v1/payments",
       paymentData,
-      {
-        headers: {
-          Authorization: `Bearer ${mercadoPagoAccessToken}`,
-          "Content-Type": "application/json",
-        },
-      }
+      { headers: { Authorization: `Bearer ${mercadoPagoAccessToken}` } }
     );
 
-    const paymentId = mpResponse.data.id;
-    const pixData = mpResponse.data.point_of_interaction.transaction_data;
+    const paymentId = mpRes.data.id;
+    const pixData   = mpRes.data.point_of_interaction.transaction_data;
 
-    await admin
-      .firestore()
-      .collection("payments")
-      .doc(String(paymentId))
-      .set({
-        email,
-        status: "pending",
-        paymentId,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+    await admin.firestore().collection("payments").doc(String(paymentId)).set({
+      email,
+      status: "pending",
+      paymentId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp()
+    });
 
     res.status(200).json({
+      success: true,
       paymentId,
       qrCodeImage: pixData.qr_code_base64,
-      pixCopiaECola: pixData.qr_code,
+      pixCopiaECola: pixData.qr_code
     });
-  } catch (error) {
-    console.error(
-      "Erro ao criar pagamento:",
-      error.response ? error.response.data : error
-    );
-    res.status(500).json({ error: "Erro ao processar pagamento" });
+  } catch (err) {
+    console.error("Erro ao criar pagamento:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// --------------- Rota: Verificar Status ------------------
+// Consultar status
 app.get("/check-payment-status", async (req, res) => {
   try {
     const { paymentId } = req.query;
-
     if (!paymentId) {
       return res.status(400).json({ error: "ID da transação é obrigatório" });
     }
 
-    const paymentDoc = await admin
-      .firestore()
-      .collection("payments")
-      .doc(String(paymentId))
-      .get();
-
-    if (!paymentDoc.exists) {
+    const doc = await admin.firestore().collection("payments").doc(String(paymentId)).get();
+    if (!doc.exists) {
       return res.status(404).json({ error: "Pagamento não encontrado" });
     }
 
-    res.status(200).json({ status: paymentDoc.data().status });
-  } catch (error) {
-    console.error("Erro ao verificar status:", error);
-    res.status(500).json({ error: "Erro ao verificar status." });
+    res.status(200).json({ success: true, status: doc.data().status });
+  } catch (err) {
+    console.error("Erro ao verificar status:", err);
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ----------------- Rota: Webhook Mercado Pago ------------
+// Webhook Mercado Pago
 app.post("/payment-webhook", async (req, res) => {
   const mercadoPagoAccessToken = functions.config().mercadopago.token;
-  const webhookSecret = functions.config().mercadopago.secret;
+  const webhookSecret          = functions.config().mercadopago.secret;
 
-  const signatureHeader = req.get("x-signature");
-  if (!signatureHeader || !webhookSecret) {
+  const sigHeader = req.get("x-signature");
+  if (!sigHeader || !webhookSecret) {
     return res.status(401).send("Assinatura inválida.");
   }
 
-  const parts = signatureHeader.split(",").reduce((acc, part) => {
-    const [key, value] = part.split("=");
-    acc[key.trim()] = value;
+  const parts = sigHeader.split(",").reduce((acc, part) => {
+    const [k, v] = part.split("=");
+    acc[k.trim()] = v;
     return acc;
   }, {});
-
-  const ts = parts.ts;
-  const signature = parts.v1;
-  const manifest = `id:${req.body.data.id};data-id:${req.body.data.id};ts:${ts};`;
-  const hmac = crypto.createHmac("sha256", webhookSecret);
-  hmac.update(manifest);
-  const computedSignature = hmac.digest("hex");
-
-  if (computedSignature !== signature) {
+  const ts     = parts.ts;
+  const sig    = parts.v1;
+  const hmac   = crypto.createHmac("sha256", webhookSecret);
+  hmac.update(`id:${req.body.data.id};data-id:${req.body.data.id};ts:${ts};`);
+  const calcSig = hmac.digest("hex");
+  if (calcSig !== sig) {
     return res.status(401).send("Assinatura inválida.");
   }
 
   try {
     if (req.body.topic === "payment") {
       const paymentId = req.body.data.id;
-      const paymentResponse = await axios.get(
+      const resp = await axios.get(
         `https://api.mercadopago.com/v1/payments/${paymentId}`,
-        {
-          headers: { Authorization: `Bearer ${mercadoPagoAccessToken}` },
-        }
+        { headers: { Authorization: `Bearer ${mercadoPagoAccessToken}` } }
       );
 
-      if (paymentResponse.data.status === "approved") {
-        await admin
-          .firestore()
-          .collection("payments")
-          .doc(String(paymentId))
-          .update({
-            status: "paid",
-            paidAt: admin.firestore.FieldValue.serverTimestamp(),
-          });
+      if (resp.data.status === "approved") {
+        await admin.firestore().collection("payments").doc(String(paymentId)).update({
+          status: "paid",
+          paidAt: admin.firestore.FieldValue.serverTimestamp()
+        });
       }
     }
     res.status(200).send("Webhook processado.");
-  } catch (error) {
-    console.error("Erro no webhook:", error);
+  } catch (err) {
+    console.error("Erro no webhook:", err);
     res.status(500).send("Erro interno.");
   }
 });
 
-// Exporta o app Express como única Cloud Function
-exports.api = onRequest(app);
+/* --------- EXPORTA COMO ÚNICA CLOUD FUNCTION --------- */
+exports.api = onRequest({ cpu: 1, memory: "256MiB" }, app);
