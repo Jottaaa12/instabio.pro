@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - Plano Spotify Econômico</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="pagamento.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="https://placehold.co/32x32/1DB954/FFFFFF?text=S" type="image/png">
+</head>
+<body>
+    <main class="checkout-container">
+        <div class="checkout-box">
+            <h1>Quase lá! Complete o pagamento para garantir seu acesso.</h1>
+            
+            <form id="payment-form" class="payment-form">
+                <div class="form-group">
+                    <label for="user-email">E-mail</label>
+                    <input type="email" id="user-email" placeholder="Seu melhor e-mail" required>
+                </div>
+
+                <button type="button" id="pay-button" class="pay-button">
+                    Pagar R$ 10,00 com PIX
+                </button>
+            </form>
+
+            <div id="pix-display" class="pix-display" style="display: none;">
+                <h2>Escaneie o QR Code ou use o código Pix abaixo</h2>
+                
+                <div class="qr-code-container">
+                    <img id="pix-qr-code" alt="QR Code do PIX" src="">
+                </div>
+
+                <div class="copy-paste-container">
+                    <label for="pix-copy-paste">Código Pix Copia e Cola:</label>
+                    <div class="copy-paste-wrapper">
+                        <input type="text" id="pix-copy-paste" readonly>
+                        <button id="copy-button" class="copy-button">Copiar</button>
+                    </div>
+                </div>
+
+                <p id="status-message" class="status-message">
+                    Aguardando pagamento... Após pagar, você será redirecionado automaticamente.
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <!-- JavaScript -->
+    <script src="pagamento.js"></script>
+</body>
+</html> 

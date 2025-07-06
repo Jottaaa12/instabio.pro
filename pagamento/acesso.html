@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acesso Liberado - Plano Spotify Econômico</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="pagamento.css">
+    
+    <!-- Favicon -->
+    <link rel="icon" href="https://placehold.co/32x32/1DB954/FFFFFF?text=S" type="image/png">
+</head>
+<body>
+    <main class="acesso-container">
+        <div class="acesso-box">
+            <h1>Pagamento Aprovado! Bem-vindo ao Plano.</h1>
+            
+            <h3>Olá, <span id="user-email-display"></span>! Siga os 2 passos abaixo:</h3>
+
+            <div class="passos-container">
+                <div class="passo">
+                    <p><strong>Passo 1:</strong> <a id="spotify-link" href="#" target="_blank">CLIQUE AQUI para aceitar o convite e entrar no plano.</a></p>
+                </div>
+
+                <div class="passo">
+                    <p><strong>Passo 2:</strong> Ao aceitar, o Spotify pedirá para você confirmar um endereço. Use exatamente este: <strong>Alameda Bitupitá, Eusébio - CE, Brazil</strong>.</p>
+                </div>
+            </div>
+
+            <div class="suporte-info">
+                <p>Precisa de ajuda? Entre em contato com nosso suporte via WhatsApp.</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Pega o e-mail da URL e exibe
+        window.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const email = urlParams.get('email');
+            if (email) {
+                document.getElementById('user-email-display').textContent = email;
+            }
+            
+            // Aqui você deve configurar o link do Spotify dinamicamente
+            // Por enquanto está como placeholder
+            document.getElementById('spotify-link').href = '#';
+        });
+    </script>
+</body>
+</html> 
