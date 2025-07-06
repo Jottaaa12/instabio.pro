@@ -1,81 +1,110 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const functions = require("firebase-functions");
+const express = require("express");
+const cors = require("cors");
 const admin = require("firebase-admin");
-const cors = require("cors")({ origin: "https://jottaaa12.github.io" });
 const axios = require("axios");
 const crypto = require("crypto");
 
 // Inicializa o Firebase Admin
 admin.initializeApp();
 
-// --- FUNÇÃO PARA CRIAR O PAGAMENTO ---
-exports.createPayment = onRequest((req, res) => {
-  cors(req, res, async () => {
-    if (req.method !== "POST") {
-      return res.status(405).send("Método não permitido");
+// Cria a instância do Express
+const app = express();
+
+// Habilita CORS apenas para o domínio do GitHub Pages
+app.use(cors({ origin: "https://jottaaa12.github.io" }));
+
+// Middleware para parsear JSON
+app.use(express.json());
+
+// ----------------- Rota: Criar Pagamento -----------------
+app.post("/create-payment", async (req, res) => {
+  try {
+    const mercadoPagoAccessToken = functions.config().mercadopago.token;
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "E-mail é obrigatório" });
     }
 
-    try {
-      // Lê o token do Mercado Pago somente quando a função é executada
-      const mercadoPagoAccessToken = functions.config().mercadopago.token;
-      const { email } = req.body;
-      if (!email) {
-        return res.status(400).json({ error: "E-mail é obrigatório" });
+    const paymentData = {
+      transaction_amount: 10.0,
+      description: "Acesso Plano Spotify",
+      payment_method_id: "pix",
+      payer: { email },
+    };
+
+    const mpResponse = await axios.post(
+      "https://api.mercadopago.com/v1/payments",
+      paymentData,
+      {
+        headers: {
+          Authorization: `Bearer ${mercadoPagoAccessToken}`,
+          "Content-Type": "application/json",
+        },
       }
+    );
 
-      const paymentData = {
-        transaction_amount: 10.0,
-        description: "Acesso Plano Spotify",
-        payment_method_id: "pix",
-        payer: { email: email },
-      };
+    const paymentId = mpResponse.data.id;
+    const pixData = mpResponse.data.point_of_interaction.transaction_data;
 
-      const mpResponse = await axios.post(
-        "https://api.mercadopago.com/v1/payments",
-        paymentData,
-        {
-          headers: {
-            Authorization: `Bearer ${mercadoPagoAccessToken}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      const paymentId = mpResponse.data.id;
-      const pixData = mpResponse.data.point_of_interaction.transaction_data;
-
-      await admin
-        .firestore()
-        .collection("payments")
-        .doc(String(paymentId))
-        .set({
-          email: email,
-          status: "pending",
-          paymentId: paymentId,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-
-      res.status(200).json({
-        paymentId: paymentId,
-        qrCodeImage: pixData.qr_code_base64,
-        pixCopiaECola: pixData.qr_code,
+    await admin
+      .firestore()
+      .collection("payments")
+      .doc(String(paymentId))
+      .set({
+        email,
+        status: "pending",
+        paymentId,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-    } catch (error) {
-      console.error(
-        "Erro ao criar pagamento:",
-        error.response ? error.response.data : "Erro desconhecido"
-      );
-      res.status(500).json({ error: "Erro ao processar pagamento" });
-    }
-  });
+
+    res.status(200).json({
+      paymentId,
+      qrCodeImage: pixData.qr_code_base64,
+      pixCopiaECola: pixData.qr_code,
+    });
+  } catch (error) {
+    console.error(
+      "Erro ao criar pagamento:",
+      error.response ? error.response.data : error
+    );
+    res.status(500).json({ error: "Erro ao processar pagamento" });
+  }
 });
 
-// --- WEBHOOK DE PAGAMENTO ---
-exports.paymentWebhook = onRequest(async (req, res) => {
-  // Lê as secrets dentro da função para evitar problemas de inicialização
+// --------------- Rota: Verificar Status ------------------
+app.get("/check-payment-status", async (req, res) => {
+  try {
+    const { paymentId } = req.query;
+
+    if (!paymentId) {
+      return res.status(400).json({ error: "ID da transação é obrigatório" });
+    }
+
+    const paymentDoc = await admin
+      .firestore()
+      .collection("payments")
+      .doc(String(paymentId))
+      .get();
+
+    if (!paymentDoc.exists) {
+      return res.status(404).json({ error: "Pagamento não encontrado" });
+    }
+
+    res.status(200).json({ status: paymentDoc.data().status });
+  } catch (error) {
+    console.error("Erro ao verificar status:", error);
+    res.status(500).json({ error: "Erro ao verificar status." });
+  }
+});
+
+// ----------------- Rota: Webhook Mercado Pago ------------
+app.post("/payment-webhook", async (req, res) => {
   const mercadoPagoAccessToken = functions.config().mercadopago.token;
   const webhookSecret = functions.config().mercadopago.secret;
-  
+
   const signatureHeader = req.get("x-signature");
   if (!signatureHeader || !webhookSecret) {
     return res.status(401).send("Assinatura inválida.");
@@ -126,31 +155,5 @@ exports.paymentWebhook = onRequest(async (req, res) => {
   }
 });
 
-// --- CHECAR STATUS DO PAGAMENTO ---
-exports.checkPaymentStatus = onRequest((req, res) => {
-  cors(req, res, async () => {
-    try {
-      const { paymentId } = req.query;
-      if (!paymentId) {
-        return res
-          .status(400)
-          .json({ error: "ID da transação é obrigatório" });
-      }
-
-      const paymentDoc = await admin
-        .firestore()
-        .collection("payments")
-        .doc(String(paymentId))
-        .get();
-
-      if (!paymentDoc.exists) {
-        return res.status(404).json({ error: "Pagamento não encontrado" });
-      }
-
-      res.status(200).json({ status: paymentDoc.data().status });
-    } catch (error) {
-      console.error("Erro ao verificar status:", error);
-      res.status(500).json({ error: "Erro ao verificar status." });
-    }
-  });
-});
+// Exporta o app Express como única Cloud Function
+exports.api = onRequest(app);
