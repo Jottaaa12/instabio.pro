@@ -1,11 +1,19 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-const cors = require('cors')({ origin: true });
+const cors = require('cors');
 const axios = require('axios');
 const crypto = require('crypto');
 
 // Inicializa o Firebase Admin
 admin.initializeApp();
+
+// Configuração do CORS para aceitar requisições do GitHub Pages
+const corsHandler = cors({ 
+    origin: "https://jottaaa12.github.io",
+    methods: ['GET', 'POST', 'OPTIONS'], // Métodos permitidos
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-signature'], // Headers permitidos
+    credentials: true // Permite credenciais
+});
 
 // Configurações do Mercado Pago
 // IMPORTANTE: Substitua 'YOUR_ACCESS_TOKEN' pelo seu token do Mercado Pago
@@ -46,7 +54,7 @@ function verificarAssinaturaMercadoPago(requestBody, signature) {
 
 // Função para criar pagamento
 exports.createPayment = functions.https.onRequest((req, res) => {
-    cors(req, res, async () => {
+    corsHandler(req, res, async () => {
         try {
             const { email } = req.body;
 
@@ -93,7 +101,7 @@ exports.createPayment = functions.https.onRequest((req, res) => {
 
 // Função para verificar status do pagamento
 exports.checkPaymentStatus = functions.https.onRequest((req, res) => {
-    cors(req, res, async () => {
+    corsHandler(req, res, async () => {
         try {
             const { transactionId } = req.body;
 
@@ -119,7 +127,7 @@ exports.checkPaymentStatus = functions.https.onRequest((req, res) => {
 
 // Webhook para receber notificações do Mercado Pago
 exports.paymentWebhook = functions.https.onRequest((req, res) => {
-    cors(req, res, async () => {
+    corsHandler(req, res, async () => {
         try {
             // Obtém a assinatura do header
             const signature = req.headers['x-signature'];
