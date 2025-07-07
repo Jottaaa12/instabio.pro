@@ -20,19 +20,25 @@ function isValidEmail(email) {
     return emailRegex.test(email);
 }
 
-// Função para gerar pagamento
+// Função para gerar pagamento via Efí Bank
 async function gerarPagamento(email) {
     try {
-        const response = await fetch(`${FIREBASE_FUNCTIONS_URL}/create-payment`, {
+        // Chama a nova Cloud Function da Efí
+        const response = await fetch(`${FIREBASE_FUNCTIONS_URL}/criarCobrancaEfi`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ email }),
+            body: JSON.stringify({ 
+                email,
+                valor: "10.00",
+                descricao: "Acesso Plano Spotify"
+            }),
         });
 
         if (!response.ok) {
-            throw new Error('Erro ao gerar pagamento');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Erro ao gerar pagamento');
         }
 
         const data = await response.json();
@@ -43,8 +49,8 @@ async function gerarPagamento(email) {
         pixDisplay.style.display = 'block';
         
         // Inicia a verificação de status
-        currentTransactionId = data.transactionId;
-        iniciarVerificacaoStatus(data.transactionId);
+        currentTransactionId = data.txid;
+        iniciarVerificacaoStatus(data.txid);
 
     } catch (error) {
         console.error('Erro:', error);
@@ -56,12 +62,12 @@ async function gerarPagamento(email) {
 // Função para verificar status do pagamento
 async function verificarStatus(transactionId) {
     try {
-        const response = await fetch(`${FIREBASE_FUNCTIONS_URL}/check-payment-status`, {
+        const response = await fetch(`${FIREBASE_FUNCTIONS_URL}/consultarStatusPix`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ transactionId }),
+            body: JSON.stringify({ txid: transactionId }),
         });
 
         if (!response.ok) {

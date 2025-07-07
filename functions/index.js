@@ -1,12 +1,13 @@
 const functions = require("firebase-functions");
-const { onRequest } = require("firebase-functions/v2/https");
+const { onRequest, onCall } = require("firebase-functions/v2/https");
 const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
 const axios = require("axios");
 const crypto = require("crypto");
-const Efipay = require("efipay");
+const Gerencianet = require("gn-api-sdk-node");
 const fs = require("fs");
+const { defineString } = require("firebase-functions/params");
 
 // Inicializa o Firebase Admin
 admin.initializeApp();
@@ -20,132 +21,424 @@ app.use(cors({ origin: "https://jottaaa12.github.io" }));
 // Habilita JSON no body
 app.use(express.json());
 
-// Configurações da Efí via variáveis de ambiente
-const efiOptions = {
-  client_id: process.env.EFI_CLIENT_ID_PROD,
-  client_secret: process.env.EFI_CLIENT_SECRET_PROD,
-  // O certificado vem como base64 para evitar expor arquivo no repositório
-  certificate: Buffer.from(process.env.EFI_CERT_BASE64 || "", "base64"),
-  sandbox: false // Produção
-};
+// ============================================================================
+// PARÂMETROS DE CONFIGURAÇÃO (v2 Firebase Functions)
+// ============================================================================
 
-// Chave Pix vinculada à conta Efí (EVP ou chave aleatória)
-const EFI_PIX_KEY = process.env.EFI_PIX_KEY;
+// Credenciais de Produção
+const EFI_CLIENT_ID_PROD = defineString("efi.client_id_prod");
+const EFI_CLIENT_SECRET_PROD = defineString("efi.client_secret_prod");
 
-// Helper para instanciar cliente Efí
-function getEfiClient() {
-  return new Efipay(efiOptions);
+// Credenciais de Homologação
+const EFI_CLIENT_ID_HOMOLOG = defineString("efi.client_id_homolog");
+const EFI_CLIENT_SECRET_HOMOLOG = defineString("efi.client_secret_homolog");
+
+// Configurações gerais
+const EFI_CERT_BASE64 = defineString("efi.cert_base64");
+const EFI_SANDBOX = defineString("efi.sandbox");
+const EFI_CHAVE_PIX = defineString("efi.chave_pix");
+const EFI_WEBHOOK_SECRET = defineString("efi.webhook_secret");
+
+// ============================================================================
+// FUNÇÕES AUXILIARES
+// ============================================================================
+
+/**
+ * Obtém as configurações da Efí de forma segura (v2)
+ * @returns {Object} Configurações da Efí
+ */
+function getEfiConfig() {
+  const isSandbox = EFI_SANDBOX.value() === "true";
+  
+  return {
+    client_id: isSandbox ? EFI_CLIENT_ID_HOMOLOG.value() : EFI_CLIENT_ID_PROD.value(),
+    client_secret: isSandbox ? EFI_CLIENT_SECRET_HOMOLOG.value() : EFI_CLIENT_SECRET_PROD.value(),
+    sandbox: isSandbox,
+    certificate: EFI_CERT_BASE64.value() ? Buffer.from(EFI_CERT_BASE64.value(), "base64") : null,
+    webhook_secret: EFI_WEBHOOK_SECRET.value(),
+    chave_pix: EFI_CHAVE_PIX.value()
+  };
 }
 
-/* ---------------------- ROTAS ---------------------- */
+/**
+ * Inicializa o cliente da Efí com as configurações corretas
+ * @returns {Object} Cliente da Efí configurado
+ */
+function getEfiClient() {
+  const config = getEfiConfig();
+  
+  const efiOptions = {
+    client_id: config.client_id,
+    client_secret: config.client_secret,
+    sandbox: config.sandbox,
+    certificate: config.certificate
+  };
 
-// Criar pagamento
-app.post("/create-payment", async (req, res) => {
+  return new Gerencianet(efiOptions);
+}
+
+// ============================================================================
+// LISTA DE SEGREDOS PARA AS FUNCTIONS
+// ============================================================================
+
+const ALL_EFI_SECRETS = [
+  EFI_CLIENT_ID_PROD,
+  EFI_CLIENT_SECRET_PROD,
+  EFI_CLIENT_ID_HOMOLOG,
+  EFI_CLIENT_SECRET_HOMOLOG,
+  EFI_CERT_BASE64,
+  EFI_SANDBOX,
+  EFI_CHAVE_PIX,
+  EFI_WEBHOOK_SECRET
+];
+
+const WEBHOOK_SECRETS = [EFI_WEBHOOK_SECRET];
+
+// ============================================================================
+// FUNÇÃO 1: CRIAR COBRANÇA EFI (Para o Frontend Chamar)
+// ============================================================================
+
+/**
+ * Cria uma cobrança PIX imediata via Efí Bank
+ * Gatilho: https.onCall (chamada direta do frontend)
+ */
+exports.criarCobrancaEfi = onCall({ 
+  maxInstances: 10,
+  memory: "256MiB",
+  secrets: ALL_EFI_SECRETS
+}, async (request) => {
   try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ error: "E-mail é obrigatório" });
+    // Verifica se o usuário está autenticado (opcional)
+    if (!request.auth) {
+      throw new functions.https.HttpsError(
+        'unauthenticated', 
+        'Usuário não autenticado'
+      );
     }
 
-    // Cria cobrança imediata PIX via Efí
-    const efipay = getEfiClient();
+    const { valor = "10.00", email, descricao = "Acesso Plano Spotify" } = request.data;
 
+    if (!email) {
+      throw new functions.https.HttpsError(
+        'invalid-argument', 
+        'E-mail é obrigatório'
+      );
+    }
+
+    // Inicializa o cliente da Efí
+    const efi = getEfiClient();
+    const config = getEfiConfig();
+
+    // Dados da cobrança PIX
     const bodyCob = {
-      calendario: { expiracao: 3600 },
-      valor: { original: "10.00" },
-      chave: EFI_PIX_KEY,
-      solicitacaoPagador: "Acesso Plano Spotify"
+      calendario: { 
+        expiracao: 3600 // 1 hora
+      },
+      valor: { 
+        original: valor 
+      },
+      chave: config.chave_pix,
+      solicitacaoPagador: descricao
     };
 
-    const cobResp = await efipay.pixCreateImmediateCharge([], bodyCob);
+    console.log("Criando cobrança PIX:", { email, valor, descricao });
+
+    // Cria a cobrança imediata
+    const cobResp = await efi.pixCreateImmediateCharge([], bodyCob);
+    
+    if (!cobResp.data || !cobResp.data.txid) {
+      throw new functions.https.HttpsError(
+        'internal', 
+        'Erro ao criar cobrança: resposta inválida da Efí'
+      );
+    }
+
     const txid = cobResp.data.txid;
     const locId = cobResp.data.loc.id;
 
+    console.log("Cobrança criada com sucesso:", { txid, locId });
+
     // Gera o QR Code correspondente
-    const qrResp = await efipay.pixGenerateQRCode({ id: locId });
+    const qrResp = await efi.pixGenerateQRCode({ id: locId });
+    
+    if (!qrResp.data) {
+      throw new functions.https.HttpsError(
+        'internal', 
+        'Erro ao gerar QR Code: resposta inválida da Efí'
+      );
+    }
+
     const qrCodeImage = qrResp.data.imagemQrcode;
     const pixCopiaECola = qrResp.data.qrcode;
 
-    // Persistir no Firestore
+    // Salva a transação no Firestore
     await admin.firestore().collection("payments").doc(txid).set({
       email,
+      valor: parseFloat(valor),
+      descricao,
       status: "pending",
       txid,
-      createdAt: admin.firestore.FieldValue.serverTimestamp()
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      userId: request.auth.uid || null
     });
 
-    return res.status(200).json({
+    console.log("Transação salva no Firestore:", txid);
+
+    // Retorna os dados para o frontend
+    return {
       success: true,
-      transactionId: txid,
+      txid,
+      pixCopiaECola,
       qrCodeImage,
-      pixCopiaECola
+      valor,
+      expiracao: 3600
+    };
+
+  } catch (error) {
+    console.error("Erro ao criar cobrança PIX:", error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal', 
+      `Erro interno: ${error.message}`
+    );
+  }
+});
+
+// ============================================================================
+// FUNÇÃO 2: WEBHOOK EFI (Para a Efí Chamar)
+// ============================================================================
+
+/**
+ * Recebe e processa as notificações de pagamento da Efí
+ * Gatilho: https.onRequest (chamada pela Efí)
+ */
+exports.webhookEfi = onRequest({ 
+  maxInstances: 10,
+  memory: "256MiB",
+  secrets: WEBHOOK_SECRETS
+}, async (req, res) => {
+  try {
+    console.log("Webhook Efí recebido:", {
+      method: req.method,
+      headers: req.headers,
+      query: req.query,
+      body: req.body
     });
-  } catch (err) {
-    console.error("Erro ao criar pagamento:", err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
 
-// Consultar status (POST atende o frontend)
-app.post("/check-payment-status", async (req, res) => {
-  try {
-    const { transactionId } = req.body;
-
-    if (!transactionId) {
-      return res.status(400).json({ error: "ID da transação é obrigatório" });
+    // Verificação de Segurança (PASSO MAIS IMPORTANTE)
+    const webhookSecret = req.query.secret;
+    
+    if (!webhookSecret || webhookSecret !== EFI_WEBHOOK_SECRET.value()) {
+      console.error("Webhook secret inválido:", { 
+        received: webhookSecret, 
+        expected: EFI_WEBHOOK_SECRET.value() 
+      });
+      return res.status(401).send("Unauthorized - Secret inválido");
     }
 
-    const doc = await admin.firestore().collection("payments").doc(transactionId).get();
-    if (!doc.exists) {
-      return res.status(404).json({ error: "Pagamento não encontrado" });
-    }
+    console.log("Webhook secret validado com sucesso");
 
-    res.status(200).json({ success: true, status: doc.data().status });
-  } catch (err) {
-    console.error("Erro ao verificar status:", err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// (Opcional) Mantém compatibilidade com GET usando querystring paymentId
-app.get("/check-payment-status", async (req, res) => {
-  const { paymentId } = req.query;
-  if (!paymentId) return res.status(400).json({ error: "ID da transação é obrigatório" });
-  const doc = await admin.firestore().collection("payments").doc(paymentId).get();
-  if (!doc.exists) return res.status(404).json({ error: "Pagamento não encontrado" });
-  return res.status(200).json({ success: true, status: doc.data().status });
-});
-
-// Webhook Efí (substitui o Mercado Pago)
-app.post("/efi-webhook", async (req, res) => {
-  try {
+    // Analisa o corpo da requisição
     const { pix } = req.body;
 
     if (!Array.isArray(pix) || pix.length === 0) {
-      return res.status(400).send("Payload inválido");
+      console.log("Payload inválido - pix não é array ou está vazio");
+      return res.status(400).send("Payload inválido - pix não encontrado");
     }
 
-    // Atualiza status das transações recebidas
+    console.log(`Processando ${pix.length} evento(s) Pix`);
+
+    // Processa cada evento PIX
     const batch = admin.firestore().batch();
+    const processedTxids = [];
 
-    pix.forEach((evento) => {
-      const { txid } = evento;
-      if (txid) {
-        const ref = admin.firestore().collection("payments").doc(txid);
-        batch.update(ref, {
-          status: "paid",
-          paidAt: admin.firestore.FieldValue.serverTimestamp()
-        });
+    for (const evento of pix) {
+      const { txid, endToEndId, valor, horario } = evento;
+      
+      if (!txid) {
+        console.warn("Evento PIX sem txid:", evento);
+        continue;
       }
+
+      console.log(`Processando txid: ${txid}`);
+
+      // Busca a transação no Firestore
+      const docRef = admin.firestore().collection("payments").doc(txid);
+      const doc = await docRef.get();
+
+      if (!doc.exists) {
+        console.warn(`Transação ${txid} não encontrada no Firestore`);
+        continue;
+      }
+
+      const paymentData = doc.data();
+      
+      // Verifica se já foi processada
+      if (paymentData.status === "paid") {
+        console.log(`Transação ${txid} já foi processada anteriormente`);
+        continue;
+      }
+
+      // Atualiza o status para "paid"
+      batch.update(docRef, {
+        status: "paid",
+        paidAt: admin.firestore.FieldValue.serverTimestamp(),
+        endToEndId,
+        valorRecebido: valor,
+        horarioPagamento: horario,
+        webhookProcessedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      processedTxids.push(txid);
+      console.log(`Status atualizado para 'paid' - txid: ${txid}`);
+    }
+
+    // Executa as atualizações em lote
+    if (processedTxids.length > 0) {
+      await batch.commit();
+      console.log(`Webhook processado com sucesso. ${processedTxids.length} transação(ões) atualizada(s):`, processedTxids);
+    } else {
+      console.log("Nenhuma transação foi atualizada");
+    }
+
+    // Responde à Efí com sucesso
+    res.status(200).send("Webhook Efí processado com sucesso");
+
+  } catch (error) {
+    console.error("Erro no webhook Efí:", error);
+    res.status(500).send("Erro interno no processamento do webhook");
+  }
+});
+
+// ============================================================================
+// FUNÇÃO 3: CONFIGURAR WEBHOOK EFI (Função de Uso Único)
+// ============================================================================
+
+/**
+ * Registra programaticamente a URL do webhook nos sistemas da Efí
+ * Gatilho: https.onRequest (execução manual)
+ */
+exports.configurarWebhookEfi = onRequest({ 
+  maxInstances: 1,
+  memory: "256MiB",
+  secrets: ALL_EFI_SECRETS
+}, async (req, res) => {
+  try {
+    console.log("Iniciando configuração do webhook Efí");
+
+    // Inicializa o cliente da Efí
+    const efi = getEfiClient();
+    const config = getEfiConfig();
+
+    // Monta a URL completa do webhook
+    const projectId = process.env.GCLOUD_PROJECT;
+    const region = process.env.FUNCTION_REGION || "us-central1";
+    const webhookUrl = `https://${region}-${projectId}.cloudfunctions.net/webhookEfi?secret=${config.webhook_secret}`;
+
+    console.log("URL do webhook:", webhookUrl);
+
+    // Parâmetros para configurar o webhook
+    const params = {
+      chave: config.chave_pix
+    };
+
+    const body = {
+      webhookUrl: webhookUrl
+    };
+
+    // Cabeçalho customizado para pular a verificação mTLS
+    const customHeaders = {
+      'x-skip-mtls-checking': 'true'
+    };
+
+    console.log("Configurando webhook com parâmetros:", { params, body });
+
+    // Chama o método para configurar o webhook
+    const response = await efi.pixConfigWebhook(params, body, customHeaders);
+
+    console.log("Resposta da configuração do webhook:", response);
+
+    if (response && response.data) {
+      res.status(200).json({
+        success: true,
+        message: "Webhook configurado com sucesso!",
+        webhookUrl,
+        response: response.data
+      });
+    } else {
+      throw new Error("Resposta inválida da Efí");
+    }
+
+  } catch (error) {
+    console.error("Erro ao configurar webhook:", error);
+    
+    res.status(500).json({
+      success: false,
+      message: "Erro ao configurar webhook",
+      error: error.message
     });
+  }
+});
 
-    await batch.commit();
+// ============================================================================
+// FUNÇÃO AUXILIAR: CONSULTAR STATUS (Para o Frontend)
+// ============================================================================
 
-    return res.status(200).send("Webhook Efí processado");
-  } catch (err) {
-    console.error("Erro no webhook Efí:", err);
-    return res.status(500).send("Erro interno");
+/**
+ * Consulta o status de uma transação PIX
+ * Gatilho: https.onCall (chamada direta do frontend)
+ */
+exports.consultarStatusPix = onCall({ 
+  maxInstances: 10,
+  memory: "256MiB"
+}, async (request) => {
+  try {
+    const { txid } = request.data;
+
+    if (!txid) {
+      throw new functions.https.HttpsError(
+        'invalid-argument', 
+        'TXID é obrigatório'
+      );
+    }
+
+    // Busca a transação no Firestore
+    const doc = await admin.firestore().collection("payments").doc(txid).get();
+    
+    if (!doc.exists) {
+      throw new functions.https.HttpsError(
+        'not-found', 
+        'Transação não encontrada'
+      );
+    }
+
+    const paymentData = doc.data();
+
+    return {
+      success: true,
+      txid,
+      status: paymentData.status,
+      email: paymentData.email,
+      valor: paymentData.valor,
+      createdAt: paymentData.createdAt,
+      paidAt: paymentData.paidAt
+    };
+
+  } catch (error) {
+    console.error("Erro ao consultar status:", error);
+    
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+    
+    throw new functions.https.HttpsError(
+      'internal', 
+      `Erro interno: ${error.message}`
+    );
   }
 });
 
