@@ -1,46 +1,14 @@
 const functions = require("firebase-functions");
 const { onRequest, onCall } = require("firebase-functions/v2/https");
-const express = require("express");
-const cors = require("cors");
 const admin = require("firebase-admin");
-const axios = require("axios");
-const crypto = require("crypto");
 const Gerencianet = require("gn-api-sdk-node");
-const fs = require("fs");
-const { defineString } = require("firebase-functions/params");
+
 
 // Inicializa o Firebase Admin
 admin.initializeApp();
 
-// Cria o app Express
-const app = express();
-
-// Habilita CORS somente para o GitHub Pages
-app.use(cors({ origin: "https://jottaaa12.github.io" }));
-
-// Habilita JSON no body
-app.use(express.json());
-
 // ============================================================================
-// PARÂMETROS DE CONFIGURAÇÃO (v2 Firebase Functions)
-// ============================================================================
-
-// Credenciais de Produção
-const EFI_CLIENT_ID_PROD = defineString("efi.client_id_prod");
-const EFI_CLIENT_SECRET_PROD = defineString("efi.client_secret_prod");
-
-// Credenciais de Homologação
-const EFI_CLIENT_ID_HOMOLOG = defineString("efi.client_id_homolog");
-const EFI_CLIENT_SECRET_HOMOLOG = defineString("efi.client_secret_homolog");
-
-// Configurações gerais
-const EFI_CERT_BASE64 = defineString("efi.cert_base64");
-const EFI_SANDBOX = defineString("efi.sandbox");
-const EFI_CHAVE_PIX = defineString("efi.chave_pix");
-const EFI_WEBHOOK_SECRET = defineString("efi.webhook_secret");
-
-// ============================================================================
-// FUNÇÕES AUXILIARES
+// CONFIGURAÇÃO SEGURA VIA FIREBASE ENVIRONMENT CONFIGURATION (v2)
 // ============================================================================
 
 /**
@@ -48,15 +16,16 @@ const EFI_WEBHOOK_SECRET = defineString("efi.webhook_secret");
  * @returns {Object} Configurações da Efí
  */
 function getEfiConfig() {
-  const isSandbox = EFI_SANDBOX.value() === "true";
+  // Usa process.env para acessar as variáveis de ambiente configuradas
+  const isSandbox = process.env.EFI_SANDBOX === "true";
   
   return {
-    client_id: isSandbox ? EFI_CLIENT_ID_HOMOLOG.value() : EFI_CLIENT_ID_PROD.value(),
-    client_secret: isSandbox ? EFI_CLIENT_SECRET_HOMOLOG.value() : EFI_CLIENT_SECRET_PROD.value(),
+    client_id: isSandbox ? process.env.EFI_CLIENT_ID_HOMOLOG : process.env.EFI_CLIENT_ID_PROD,
+    client_secret: isSandbox ? process.env.EFI_CLIENT_SECRET_HOMOLOG : process.env.EFI_CLIENT_SECRET_PROD,
     sandbox: isSandbox,
-    certificate: EFI_CERT_BASE64.value() ? Buffer.from(EFI_CERT_BASE64.value(), "base64") : null,
-    webhook_secret: EFI_WEBHOOK_SECRET.value(),
-    chave_pix: EFI_CHAVE_PIX.value()
+    certificate: process.env.EFI_CERT_BASE64 ? Buffer.from(process.env.EFI_CERT_BASE64, "base64") : null,
+    webhook_secret: process.env.EFI_WEBHOOK_SECRET,
+    chave_pix: process.env.EFI_CHAVE_PIX
   };
 }
 
@@ -78,23 +47,6 @@ function getEfiClient() {
 }
 
 // ============================================================================
-// LISTA DE SEGREDOS PARA AS FUNCTIONS
-// ============================================================================
-
-const ALL_EFI_SECRETS = [
-  EFI_CLIENT_ID_PROD,
-  EFI_CLIENT_SECRET_PROD,
-  EFI_CLIENT_ID_HOMOLOG,
-  EFI_CLIENT_SECRET_HOMOLOG,
-  EFI_CERT_BASE64,
-  EFI_SANDBOX,
-  EFI_CHAVE_PIX,
-  EFI_WEBHOOK_SECRET
-];
-
-const WEBHOOK_SECRETS = [EFI_WEBHOOK_SECRET];
-
-// ============================================================================
 // FUNÇÃO 1: CRIAR COBRANÇA EFI (Para o Frontend Chamar)
 // ============================================================================
 
@@ -104,8 +56,7 @@ const WEBHOOK_SECRETS = [EFI_WEBHOOK_SECRET];
  */
 exports.criarCobrancaEfi = onCall({ 
   maxInstances: 10,
-  memory: "256MiB",
-  secrets: ALL_EFI_SECRETS
+  memory: "256MiB"
 }, async (request) => {
   try {
     // Verifica se o usuário está autenticado (opcional)
@@ -208,6 +159,150 @@ exports.criarCobrancaEfi = onCall({
   }
 });
 
+/**
+ * Versão HTTP da função criarCobrancaEfi (para compatibilidade)
+ * Gatilho: https.onRequest (chamada via HTTP POST)
+ */
+exports.criarCobrancaEfiHttp = onRequest({ 
+  maxInstances: 10,
+  memory: "256MiB",
+  cors: true
+}, async (req, res) => {
+  try {
+    // Verifica se é POST
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Método não permitido' });
+    }
+
+    // Extrai dados do body (compatível com onCall)
+    const requestData = req.body.data || req.body;
+    const { valor = "10.00", email, descricao = "Acesso Plano Spotify" } = requestData;
+
+    if (!email) {
+      return res.status(400).json({ error: 'E-mail é obrigatório' });
+    }
+
+    // Inicializa o cliente da Efí
+    const efi = getEfiClient();
+    const config = getEfiConfig();
+
+    // Dados da cobrança PIX
+    const bodyCob = {
+      calendario: { 
+        expiracao: 3600 // 1 hora
+      },
+      valor: { 
+        original: valor 
+      },
+      chave: config.chave_pix,
+      solicitacaoPagador: descricao
+    };
+
+    console.log("Criando cobrança PIX (HTTP):", { email, valor, descricao });
+
+    // Cria a cobrança imediata
+    const cobResp = await efi.pixCreateImmediateCharge([], bodyCob);
+    
+    if (!cobResp.data || !cobResp.data.txid) {
+      return res.status(500).json({ error: 'Erro ao criar cobrança: resposta inválida da Efí' });
+    }
+
+    const txid = cobResp.data.txid;
+    const locId = cobResp.data.loc.id;
+
+    console.log("Cobrança criada com sucesso (HTTP):", { txid, locId });
+
+    // Gera o QR Code correspondente
+    const qrResp = await efi.pixGenerateQRCode({ id: locId });
+    
+    if (!qrResp.data) {
+      return res.status(500).json({ error: 'Erro ao gerar QR Code: resposta inválida da Efí' });
+    }
+
+    const qrCodeImage = qrResp.data.imagemQrcode;
+    const pixCopiaECola = qrResp.data.qrcode;
+
+    // Salva a transação no Firestore
+    await admin.firestore().collection("payments").doc(txid).set({
+      email,
+      valor: parseFloat(valor),
+      descricao,
+      status: "pending",
+      txid,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      userId: null // HTTP não tem auth
+    });
+
+    console.log("Transação salva no Firestore (HTTP):", txid);
+
+    // Retorna os dados para o frontend (formato compatível com onCall)
+    res.status(200).json({
+      result: {
+        success: true,
+        txid,
+        pixCopiaECola,
+        qrCodeImage,
+        valor,
+        expiracao: 3600
+      }
+    });
+
+  } catch (error) {
+    console.error("Erro ao criar cobrança PIX (HTTP):", error);
+    res.status(500).json({ error: `Erro interno: ${error.message}` });
+  }
+});
+
+/**
+ * Versão HTTP da função consultarStatusPix (para compatibilidade)
+ */
+exports.consultarStatusPixHttp = onRequest({ 
+  maxInstances: 10,
+  memory: "256MiB",
+  cors: true
+}, async (req, res) => {
+  try {
+    // Verifica se é POST
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Método não permitido' });
+    }
+
+    // Extrai dados do body (compatível com onCall)
+    const requestData = req.body.data || req.body;
+    const { txid } = requestData;
+
+    if (!txid) {
+      return res.status(400).json({ error: 'TXID é obrigatório' });
+    }
+
+    // Busca a transação no Firestore
+    const doc = await admin.firestore().collection("payments").doc(txid).get();
+    
+    if (!doc.exists) {
+      return res.status(404).json({ error: 'Transação não encontrada' });
+    }
+
+    const paymentData = doc.data();
+
+    // Retorna os dados (formato compatível com onCall)
+    res.status(200).json({
+      result: {
+        success: true,
+        txid,
+        status: paymentData.status,
+        email: paymentData.email,
+        valor: paymentData.valor,
+        createdAt: paymentData.createdAt,
+        paidAt: paymentData.paidAt
+      }
+    });
+
+  } catch (error) {
+    console.error("Erro ao consultar status (HTTP):", error);
+    res.status(500).json({ error: `Erro interno: ${error.message}` });
+  }
+});
+
 // ============================================================================
 // FUNÇÃO 2: WEBHOOK EFI (Para a Efí Chamar)
 // ============================================================================
@@ -218,8 +313,7 @@ exports.criarCobrancaEfi = onCall({
  */
 exports.webhookEfi = onRequest({ 
   maxInstances: 10,
-  memory: "256MiB",
-  secrets: WEBHOOK_SECRETS
+  memory: "256MiB"
 }, async (req, res) => {
   try {
     console.log("Webhook Efí recebido:", {
@@ -232,10 +326,10 @@ exports.webhookEfi = onRequest({
     // Verificação de Segurança (PASSO MAIS IMPORTANTE)
     const webhookSecret = req.query.secret;
     
-    if (!webhookSecret || webhookSecret !== EFI_WEBHOOK_SECRET.value()) {
+    if (!webhookSecret || webhookSecret !== process.env.EFI_WEBHOOK_SECRET) {
       console.error("Webhook secret inválido:", { 
         received: webhookSecret, 
-        expected: EFI_WEBHOOK_SECRET.value() 
+        expected: process.env.EFI_WEBHOOK_SECRET 
       });
       return res.status(401).send("Unauthorized - Secret inválido");
     }
@@ -324,8 +418,7 @@ exports.webhookEfi = onRequest({
  */
 exports.configurarWebhookEfi = onRequest({ 
   maxInstances: 1,
-  memory: "256MiB",
-  secrets: ALL_EFI_SECRETS
+  memory: "256MiB"
 }, async (req, res) => {
   try {
     console.log("Iniciando configuração do webhook Efí");
@@ -442,5 +535,4 @@ exports.consultarStatusPix = onCall({
   }
 });
 
-/* --------- EXPORTA COMO ÚNICA CLOUD FUNCTION --------- */
-exports.api = onRequest({ cpu: 1, memory: "256MiB" }, app);
+/* --------- FIM DAS FUNÇÕES --------- */

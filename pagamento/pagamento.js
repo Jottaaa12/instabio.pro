@@ -23,8 +23,8 @@ function isValidEmail(email) {
 // Função para gerar pagamento via Efí Bank
 async function gerarPagamento(email) {
     try {
-        // Chama a nova Cloud Function da Efí
-        const response = await fetch(`${FIREBASE_FUNCTIONS_URL}/criarCobrancaEfi`, {
+        // Usa a versão HTTP da função (mais compatível)
+        const response = await fetch(`${FIREBASE_FUNCTIONS_URL}/criarCobrancaEfiHttp`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -44,13 +44,13 @@ async function gerarPagamento(email) {
         const data = await response.json();
         
         // Exibe o QR Code e código PIX
-        pixQrCode.src = data.qrCodeImage;
-        pixCopyPaste.value = data.pixCopiaECola;
+        pixQrCode.src = data.result.qrCodeImage;
+        pixCopyPaste.value = data.result.pixCopiaECola;
         pixDisplay.style.display = 'block';
         
         // Inicia a verificação de status
-        currentTransactionId = data.txid;
-        iniciarVerificacaoStatus(data.txid);
+        currentTransactionId = data.result.txid;
+        iniciarVerificacaoStatus(data.result.txid);
 
     } catch (error) {
         console.error('Erro:', error);
@@ -62,12 +62,14 @@ async function gerarPagamento(email) {
 // Função para verificar status do pagamento
 async function verificarStatus(transactionId) {
     try {
-        const response = await fetch(`${FIREBASE_FUNCTIONS_URL}/consultarStatusPix`, {
+        const response = await fetch(`${FIREBASE_FUNCTIONS_URL}/consultarStatusPixHttp`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ txid: transactionId }),
+            body: JSON.stringify({ 
+                txid: transactionId
+            }),
         });
 
         if (!response.ok) {
@@ -76,7 +78,7 @@ async function verificarStatus(transactionId) {
 
         const data = await response.json();
         
-        if (data.status === 'paid') {
+        if (data.result.status === 'paid') {
             // Limpa o intervalo e redireciona
             if (checkStatusInterval) {
                 clearInterval(checkStatusInterval);
