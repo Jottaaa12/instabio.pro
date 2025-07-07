@@ -18,7 +18,8 @@
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "firebase-admin": "^12.1.1",
-    "firebase-functions": "^5.1.0"
+    "firebase-functions": "^5.1.0",
+    "gn-api-sdk-node": "^3.0.4"
   },
   "devDependencies": {
     "firebase-functions-test": "^3.1.0"
