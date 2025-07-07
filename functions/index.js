@@ -1,7 +1,7 @@
-const functions = require("firebase-functions");
-const { onRequest, onCall } = require("firebase-functions/v2/https");
+const { onRequest, onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const Gerencianet = require("gn-api-sdk-node");
+const axios = require("axios");
+const https = require("https");
 
 
 // Inicializa o Firebase Admin
@@ -12,38 +12,186 @@ admin.initializeApp();
 // ============================================================================
 
 /**
- * Obtém as configurações da Efí de forma segura (v2)
+ * Obtém as configurações da Efí de forma segura (Firebase Functions v2)
  * @returns {Object} Configurações da Efí
  */
 function getEfiConfig() {
-  // Usa process.env para acessar as variáveis de ambiente configuradas
+  // Firebase Functions v2 usa process.env para variáveis de ambiente
   const isSandbox = process.env.EFI_SANDBOX === "true";
   
   return {
     client_id: isSandbox ? process.env.EFI_CLIENT_ID_HOMOLOG : process.env.EFI_CLIENT_ID_PROD,
     client_secret: isSandbox ? process.env.EFI_CLIENT_SECRET_HOMOLOG : process.env.EFI_CLIENT_SECRET_PROD,
     sandbox: isSandbox,
-    certificate: process.env.EFI_CERT_BASE64 ? Buffer.from(process.env.EFI_CERT_BASE64, "base64") : null,
     webhook_secret: process.env.EFI_WEBHOOK_SECRET,
-    chave_pix: process.env.EFI_CHAVE_PIX
+    chave_pix: process.env.EFI_CHAVE_PIX,
+    base_url: isSandbox ? "https://pix-h.api.efipay.com.br" : "https://pix.api.efipay.com.br"
   };
 }
 
 /**
- * Inicializa o cliente da Efí com as configurações corretas
- * @returns {Object} Cliente da Efí configurado
+ * Cria um cliente HTTP com certificado para a Efí
+ * @returns {Object} Cliente HTTP configurado
  */
-function getEfiClient() {
+function createEfiHttpClient() {
   const config = getEfiConfig();
   
-  const efiOptions = {
-    client_id: config.client_id,
-    client_secret: config.client_secret,
-    sandbox: config.sandbox,
-    certificate: config.certificate
-  };
+  // Verifica se o certificado está disponível
+  if (!process.env.EFI_CERT_BASE64) {
+    throw new Error("Certificado P12 não configurado. Configure a variável EFI_CERT_BASE64");
+  }
 
-  return new Gerencianet(efiOptions);
+  // Converte o certificado de Base64 para Buffer
+  let certificate;
+  try {
+    certificate = Buffer.from(process.env.EFI_CERT_BASE64, "base64");
+    console.log("Certificado carregado com sucesso, tamanho:", certificate.length, "bytes");
+    
+    // Verifica se o certificado tem um tamanho mínimo válido
+    if (certificate.length < 100) {
+      throw new Error("Certificado muito pequeno, pode estar corrompido");
+    }
+    
+    // Verifica se o certificado começa com os bytes corretos de um arquivo P12
+    const p12Header = certificate.slice(0, 4);
+    console.log("Header do certificado (hex):", p12Header.toString('hex'));
+    
+  } catch (error) {
+    console.error("Erro ao converter certificado de Base64:", error);
+    throw new Error("FALHA AO LER O CERTIFICADO: " + error.message);
+  }
+
+  // Cria o agente HTTPS com certificado
+  const httpsAgent = new https.Agent({
+    pfx: certificate,
+    passphrase: process.env.EFI_CERT_PASSWORD || ""
+  });
+
+  // Cria o cliente axios com configurações
+  const client = axios.create({
+    baseURL: config.base_url,
+    httpsAgent: httpsAgent,
+    timeout: 30000,
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'SpotifyVendas/1.0'
+    }
+  });
+
+  // Adiciona interceptor para autenticação
+  client.interceptors.request.use(async (config) => {
+    // Gera token de acesso se necessário
+    if (!client.accessToken || client.tokenExpiry < Date.now()) {
+      await generateAccessToken(client);
+    }
+    
+    if (client.accessToken) {
+      config.headers.Authorization = `Bearer ${client.accessToken}`;
+    }
+    
+    return config;
+  });
+
+  return client;
+}
+
+/**
+ * Gera token de acesso para a Efí
+ * @param {Object} client - Cliente HTTP da Efí
+ */
+async function generateAccessToken(client) {
+  const config = getEfiConfig();
+  
+  try {
+    const auth = Buffer.from(`${config.client_id}:${config.client_secret}`).toString('base64');
+    
+    const response = await axios.post(`${config.base_url}/oauth/token`, {
+      grant_type: "client_credentials"
+    }, {
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json'
+      },
+      httpsAgent: client.defaults.httpsAgent
+    });
+
+    if (response.data && response.data.access_token) {
+      client.accessToken = response.data.access_token;
+      client.tokenExpiry = Date.now() + (response.data.expires_in * 1000);
+      console.log("Token de acesso gerado com sucesso");
+    } else {
+      throw new Error("Resposta inválida da Efí para geração de token");
+    }
+  } catch (error) {
+    console.error("Erro ao gerar token de acesso:", error.response?.data || error.message);
+    throw new Error("FALHA AO GERAR TOKEN DE ACESSO: " + error.message);
+  }
+}
+
+/**
+ * Configura webhook usando axios diretamente
+ * @param {string} webhookUrl - URL do webhook
+ * @returns {Object} Resposta da configuração
+ */
+async function configurarWebhookEfi(webhookUrl) {
+  const config = getEfiConfig();
+  const client = createEfiHttpClient();
+  
+  try {
+    console.log("Configurando webhook:", webhookUrl);
+    
+    const response = await client.put(`/v2/webhook/${config.chave_pix}`, {
+      webhookUrl: webhookUrl
+    });
+
+    console.log("Webhook configurado com sucesso:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao configurar webhook:", error.response?.data || error.message);
+    throw new Error("FALHA AO CONFIGURAR WEBHOOK: " + (error.response?.data?.message || error.message));
+  }
+}
+
+/**
+ * Cria cobrança PIX usando axios diretamente
+ * @param {Object} cobrancaData - Dados da cobrança
+ * @returns {Object} Resposta da criação da cobrança
+ */
+async function criarCobrancaPix(cobrancaData) {
+  const client = createEfiHttpClient();
+  
+  try {
+    console.log("Criando cobrança PIX:", cobrancaData);
+    
+    const response = await client.post('/v2/cob', cobrancaData);
+    
+    console.log("Cobrança criada com sucesso:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao criar cobrança PIX:", error.response?.data || error.message);
+    throw new Error("FALHA AO CRIAR COBRANÇA: " + (error.response?.data?.message || error.message));
+  }
+}
+
+/**
+ * Gera QR Code usando axios diretamente
+ * @param {string} locId - ID da localização
+ * @returns {Object} Resposta da geração do QR Code
+ */
+async function gerarQrCode(locId) {
+  const client = createEfiHttpClient();
+  
+  try {
+    console.log("Gerando QR Code para locId:", locId);
+    
+    const response = await client.get(`/v2/loc/${locId}/qrcode`);
+    
+    console.log("QR Code gerado com sucesso:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Erro ao gerar QR Code:", error.response?.data || error.message);
+    throw new Error("FALHA AO GERAR QR CODE: " + (error.response?.data?.message || error.message));
+  }
 }
 
 // ============================================================================
@@ -61,7 +209,7 @@ exports.criarCobrancaEfi = onCall({
   try {
     // Verifica se o usuário está autenticado (opcional)
     if (!request.auth) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         'unauthenticated', 
         'Usuário não autenticado'
       );
@@ -70,18 +218,16 @@ exports.criarCobrancaEfi = onCall({
     const { valor = "10.00", email, descricao = "Acesso Plano Spotify" } = request.data;
 
     if (!email) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         'invalid-argument', 
         'E-mail é obrigatório'
       );
     }
 
-    // Inicializa o cliente da Efí
-    const efi = getEfiClient();
     const config = getEfiConfig();
 
     // Dados da cobrança PIX
-    const bodyCob = {
+    const cobrancaData = {
       calendario: { 
         expiracao: 3600 // 1 hora
       },
@@ -94,33 +240,33 @@ exports.criarCobrancaEfi = onCall({
 
     console.log("Criando cobrança PIX:", { email, valor, descricao });
 
-    // Cria a cobrança imediata
-    const cobResp = await efi.pixCreateImmediateCharge([], bodyCob);
+    // Cria a cobrança usando a nova implementação
+    const cobResp = await criarCobrancaPix(cobrancaData);
     
-    if (!cobResp.data || !cobResp.data.txid) {
-      throw new functions.https.HttpsError(
+    if (!cobResp.txid) {
+      throw new HttpsError(
         'internal', 
         'Erro ao criar cobrança: resposta inválida da Efí'
       );
     }
 
-    const txid = cobResp.data.txid;
-    const locId = cobResp.data.loc.id;
+    const txid = cobResp.txid;
+    const locId = cobResp.loc.id;
 
     console.log("Cobrança criada com sucesso:", { txid, locId });
 
     // Gera o QR Code correspondente
-    const qrResp = await efi.pixGenerateQRCode({ id: locId });
+    const qrResp = await gerarQrCode(locId);
     
-    if (!qrResp.data) {
-      throw new functions.https.HttpsError(
+    if (!qrResp) {
+      throw new HttpsError(
         'internal', 
         'Erro ao gerar QR Code: resposta inválida da Efí'
       );
     }
 
-    const qrCodeImage = qrResp.data.imagemQrcode;
-    const pixCopiaECola = qrResp.data.qrcode;
+    const qrCodeImage = qrResp.imagemQrcode;
+    const pixCopiaECola = qrResp.qrcode;
 
     // Salva a transação no Firestore
     await admin.firestore().collection("payments").doc(txid).set({
@@ -148,11 +294,11 @@ exports.criarCobrancaEfi = onCall({
   } catch (error) {
     console.error("Erro ao criar cobrança PIX:", error);
     
-    if (error instanceof functions.https.HttpsError) {
+    if (error instanceof HttpsError) {
       throw error;
     }
     
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       'internal', 
       `Erro interno: ${error.message}`
     );
@@ -182,12 +328,10 @@ exports.criarCobrancaEfiHttp = onRequest({
       return res.status(400).json({ error: 'E-mail é obrigatório' });
     }
 
-    // Inicializa o cliente da Efí
-    const efi = getEfiClient();
     const config = getEfiConfig();
 
     // Dados da cobrança PIX
-    const bodyCob = {
+    const cobrancaData = {
       calendario: { 
         expiracao: 3600 // 1 hora
       },
@@ -200,27 +344,27 @@ exports.criarCobrancaEfiHttp = onRequest({
 
     console.log("Criando cobrança PIX (HTTP):", { email, valor, descricao });
 
-    // Cria a cobrança imediata
-    const cobResp = await efi.pixCreateImmediateCharge([], bodyCob);
+    // Cria a cobrança usando a nova implementação
+    const cobResp = await criarCobrancaPix(cobrancaData);
     
-    if (!cobResp.data || !cobResp.data.txid) {
+    if (!cobResp.txid) {
       return res.status(500).json({ error: 'Erro ao criar cobrança: resposta inválida da Efí' });
     }
 
-    const txid = cobResp.data.txid;
-    const locId = cobResp.data.loc.id;
+    const txid = cobResp.txid;
+    const locId = cobResp.loc.id;
 
     console.log("Cobrança criada com sucesso (HTTP):", { txid, locId });
 
     // Gera o QR Code correspondente
-    const qrResp = await efi.pixGenerateQRCode({ id: locId });
+    const qrResp = await gerarQrCode(locId);
     
-    if (!qrResp.data) {
+    if (!qrResp) {
       return res.status(500).json({ error: 'Erro ao gerar QR Code: resposta inválida da Efí' });
     }
 
-    const qrCodeImage = qrResp.data.imagemQrcode;
-    const pixCopiaECola = qrResp.data.qrcode;
+    const qrCodeImage = qrResp.imagemQrcode;
+    const pixCopiaECola = qrResp.qrcode;
 
     // Salva a transação no Firestore
     await admin.firestore().collection("payments").doc(txid).set({
@@ -423,8 +567,6 @@ exports.configurarWebhookEfi = onRequest({
   try {
     console.log("Iniciando configuração do webhook Efí");
 
-    // Inicializa o cliente da Efí
-    const efi = getEfiClient();
     const config = getEfiConfig();
 
     // Monta a URL completa do webhook
@@ -434,37 +576,17 @@ exports.configurarWebhookEfi = onRequest({
 
     console.log("URL do webhook:", webhookUrl);
 
-    // Parâmetros para configurar o webhook
-    const params = {
-      chave: config.chave_pix
-    };
-
-    const body = {
-      webhookUrl: webhookUrl
-    };
-
-    // Cabeçalho customizado para pular a verificação mTLS
-    const customHeaders = {
-      'x-skip-mtls-checking': 'true'
-    };
-
-    console.log("Configurando webhook com parâmetros:", { params, body });
-
-    // Chama o método para configurar o webhook
-    const response = await efi.pixConfigWebhook(params, body, customHeaders);
+    // Usa a nova implementação com axios
+    const response = await configurarWebhookEfi(webhookUrl);
 
     console.log("Resposta da configuração do webhook:", response);
 
-    if (response && response.data) {
-      res.status(200).json({
-        success: true,
-        message: "Webhook configurado com sucesso!",
-        webhookUrl,
-        response: response.data
-      });
-    } else {
-      throw new Error("Resposta inválida da Efí");
-    }
+    res.status(200).json({
+      success: true,
+      message: "Webhook configurado com sucesso!",
+      webhookUrl,
+      response: response
+    });
 
   } catch (error) {
     console.error("Erro ao configurar webhook:", error);
@@ -493,7 +615,7 @@ exports.consultarStatusPix = onCall({
     const { txid } = request.data;
 
     if (!txid) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         'invalid-argument', 
         'TXID é obrigatório'
       );
@@ -503,7 +625,7 @@ exports.consultarStatusPix = onCall({
     const doc = await admin.firestore().collection("payments").doc(txid).get();
     
     if (!doc.exists) {
-      throw new functions.https.HttpsError(
+      throw new HttpsError(
         'not-found', 
         'Transação não encontrada'
       );
@@ -524,11 +646,11 @@ exports.consultarStatusPix = onCall({
   } catch (error) {
     console.error("Erro ao consultar status:", error);
     
-    if (error instanceof functions.https.HttpsError) {
+    if (error instanceof HttpsError) {
       throw error;
     }
     
-    throw new functions.https.HttpsError(
+    throw new HttpsError(
       'internal', 
       `Erro interno: ${error.message}`
     );
