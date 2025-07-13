@@ -187,7 +187,7 @@
 
             if (!session) {
                 // Se não houver sessão, redireciona para a página de login
-                window.location.href = 'login.html';
+                window.location.href = '/login';
             } else {
                 // Se houver sessão, exibe o corpo da página e carrega os dados
                 document.body.style.display = 'flex'; // Reverte o display: none;
@@ -201,7 +201,7 @@
             const logoutButton = document.getElementById('logout-btn');
             logoutButton.addEventListener('click', async () => {
                 await supabase.auth.signOut();
-                window.location.href = 'login.html';
+                window.location.href = '/login';
             });
 
             // Adiciona o listener para o formulário
