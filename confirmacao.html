@@ -83,7 +83,7 @@
             box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.3);
         }
 
-        .submit-btn {
+        .submit-btn, #support-btn {
             background-color: var(--primary-color);
             color: var(--text-primary);
             font-size: 1.1rem;
@@ -96,9 +96,16 @@
             margin-top: 15px;
         }
 
-        .submit-btn:hover {
+        .submit-btn:hover, #support-btn:hover {
             background-color: #1ed760;
             transform: scale(1.03);
+        }
+        
+        #support-btn {
+            background-color: #6c757d;
+        }
+        #support-btn:hover {
+            background-color: #5a6268;
         }
 
         #status-message {
@@ -107,6 +114,7 @@
             padding: 15px;
             border-radius: 5px;
             font-weight: 600;
+            text-align: left;
         }
 
         #status-message.success {
@@ -118,6 +126,29 @@
             background-color: var(--error-color);
             color: var(--text-primary);
         }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            margin: 15% auto;
+            padding: 30px;
+            border-radius: 10px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 450px;
+        }
+
     </style>
 </head>
 <body>
@@ -149,6 +180,24 @@
         </div>
 
         <div id="status-message"></div>
+        
+        <div id="support-modal" class="modal">
+            <div class="modal-content">
+                <h2>Suporte</h2>
+                <form id="support-form">
+                    <div>
+                        <label for="support-name">Seu Nome</label>
+                        <input type="text" id="support-name" required>
+                    </div>
+                    <div>
+                        <label for="support-email">Seu Email</label>
+                        <input type="email" id="support-email" required>
+                    </div>
+                    <button type="submit" class="submit-btn">Enviar para Suporte</button>
+                </form>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -158,6 +207,8 @@
         const statusMessage = document.getElementById('status-message');
         const form = document.getElementById('confirm-form');
         const submitButton = form.querySelector('.submit-btn');
+        const supportModal = document.getElementById('support-modal');
+        const supportForm = document.getElementById('support-form');
 
         // 1. Lógica de verificação de pagamento ao carregar a página
         document.addEventListener('DOMContentLoaded', async () => {
@@ -224,12 +275,22 @@
                 if (response.ok) {
                     confirmationContent.style.display = 'none';
                     statusMessage.innerHTML = `
-                        <strong>Tudo certo!</strong><br>
-                        Seu convite para o Spotify Premium foi enviado para seu e-mail.<br>
-                        Se precisar, o link é: <a href="${result.link_spotify}" target="_blank" style="color: white;">Acessar Convite</a>
+                        <h4>Tudo Certo Siga os Passos Abaixo:</h4>
+                        <p><strong>1. Acesse o convite:</strong> <a href="${result.link_spotify}" target="_blank" style="color: white; text-decoration: underline;">Clique Aqui para Aceitar o Convite</a></p>
+                        <div style="margin-top: 20px; padding: 15px; border: 1px solid #444; border-radius: 5px;">
+                            <h5>Mini-Tutorial do Endereço:</h5>
+                            <p style="font-size: 0.9em; margin-bottom: 0;">Ao aceitar o convite, o Spotify pedirá um endereço. Digite <strong>BITUPITA</strong> e escolha a primeira opção que aparecer. É simples assim!</p>
+                        </div>
+                        <button id="support-btn">Preciso de Suporte</button>
                     `;
                     statusMessage.className = 'success';
                     statusMessage.style.display = 'block';
+
+                    // Adiciona listener para o botão de suporte APÓS ele ser criado
+                    document.getElementById('support-btn').addEventListener('click', () => {
+                        supportModal.style.display = 'block';
+                    });
+
                 } else {
                     statusMessage.textContent = result.message || 'Ocorreu um erro ao enviar seus dados. Tente novamente.';
                     statusMessage.className = 'error';
@@ -245,6 +306,25 @@
                 submitButton.textContent = 'Finalizar e Receber Acesso';
             }
         });
+        
+        // 3. Lógica do Modal de Suporte
+        supportForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const name = document.getElementById('support-name').value;
+            const email = document.getElementById('support-email').value;
+            const message = encodeURIComponent(`Preciso de suporte sobre o spotify premium. Meu nome: ${name}, Email: ${email}`);
+            const whatsappUrl = `https://wa.me/5588981905006?text=${message}`;
+            window.open(whatsappUrl, '_blank');
+            supportModal.style.display = 'none';
+        });
+
+        // Fecha o modal se clicar fora do conteúdo
+        window.onclick = function(event) {
+            if (event.target == supportModal) {
+                supportModal.style.display = "none";
+            }
+        }
+
     </script>
 
 </body>
