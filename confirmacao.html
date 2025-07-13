@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falta Pouco!</title>
+    <!-- Adiciona o cliente Supabase via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary-color: #1DB954;
+            --dark-bg: #121212;
+            --card-bg: #181818;
+            --text-primary: #FFFFFF;
+            --text-secondary: #b3b3b3;
+            --error-color: #e53935;
+            --success-color: #43a047;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background-color: var(--dark-bg);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background-color: var(--card-bg);
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+        p {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            text-align: left;
+        }
+
+        label {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"] {
+            background-color: #282828;
+            border: 1px solid #404040;
+            border-radius: 5px;
+            padding: 15px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        input[type="text"]:focus,
+        input[type="email"]:focus,
+        input[type="tel"]:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.3);
+        }
+
+        .submit-btn {
+            background-color: var(--primary-color);
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            font-weight: 700;
+            border: none;
+            padding: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            margin-top: 15px;
+        }
+
+        .submit-btn:hover {
+            background-color: #1ed760;
+            transform: scale(1.03);
+        }
+
+        #status-message {
+            display: none; /* Escondido por padrão */
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            font-weight: 600;
+        }
+
+        #status-message.success {
+            background-color: var(--success-color);
+            color: var(--text-primary);
+        }
+
+        #status-message.error {
+            background-color: var(--error-color);
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Falta pouco!</h1>
+        <p>Pagamento aprovado! Preencha os dados abaixo para receber o convite do Spotify Premium.</p>
+
+        <form id="confirm-form">
+            <div>
+                <label for="full-name">Nome Completo</label>
+                <input type="text" id="full-name" name="full-name" placeholder="Seu nome completo" required>
+            </div>
+
+            <div>
+                <label for="email">E-mail (da sua conta Spotify)</label>
+                <input type="email" id="email" name="email" placeholder="email@exemplo.com" required>
+            </div>
+
+            <div>
+                <label for="phone">Telefone / WhatsApp</label>
+                <input type="tel" id="phone" name="phone" placeholder="(XX) XXXXX-XXXX" required>
+            </div>
+
+            <button type="submit" class="submit-btn">Finalizar e Receber Acesso</button>
+        </form>
+
+        <div id="status-message"></div>
+
+    </div>
+
+    <script>
+        const form = document.getElementById('confirm-form');
+        const statusMessage = document.getElementById('status-message');
+        const submitButton = form.querySelector('.submit-btn');
+        const container = document.querySelector('.container');
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            submitButton.disabled = true;
+            submitButton.textContent = 'Processando...';
+
+            const formData = {
+                nome: document.getElementById('full-name').value,
+                email: document.getElementById('email').value,
+                telefone: document.getElementById('phone').value,
+            };
+
+            try {
+                const response = await fetch('/api/assinar_plano', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData),
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    // Esconde o formulário e o parágrafo inicial
+                    form.style.display = 'none';
+                    container.querySelector('p').style.display = 'none';
+
+                    // Exibe a mensagem de sucesso
+                    statusMessage.innerHTML = `
+                        <strong>Tudo certo!</strong><br>
+                        Seu convite para o Spotify Premium foi enviado.<br>
+                        Acesse pelo link: <a href="${result.link_spotify}" target="_blank" style="color: white;">${result.link_spotify}</a>
+                    `;
+                    statusMessage.className = 'success';
+                    statusMessage.style.display = 'block';
+                } else {
+                    // Exibe a mensagem de erro
+                    statusMessage.textContent = result.message || 'Ocorreu um erro. Tente novamente.';
+                    statusMessage.className = 'error';
+                    statusMessage.style.display = 'block';
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Finalizar e Receber Acesso';
+                }
+            } catch (error) {
+                // Exibe a mensagem de erro de rede
+                statusMessage.textContent = 'Erro de conexão. Verifique sua internet e tente novamente.';
+                statusMessage.className = 'error';
+                statusMessage.style.display = 'block';
+                submitButton.disabled = false;
+                submitButton.textContent = 'Finalizar e Receber Acesso';
+            }
+        });
+    </script>
+
+</body>
+</html>
