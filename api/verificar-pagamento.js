@@ -5,10 +5,10 @@ export default async function handler(request, response) {
   }
 
   try {
-    const { slug, transaction_id } = request.body;
+    const { slug, transaction_id, order_nsu } = request.body;
 
-    if (!slug || !transaction_id) {
-      return response.status(400).json({ error: 'Parâmetros slug ou transaction_id ausentes.' });
+    if (!slug || !transaction_id || !order_nsu) {
+      return response.status(400).json({ error: 'Parâmetros slug, transaction_id ou order_nsu ausentes.' });
     }
 
     const infinitePayURL = 'https://api.infinitepay.io/invoices/public/checkout/payment_check/jottaaa0';
@@ -17,6 +17,7 @@ export default async function handler(request, response) {
       handle: 'jottaaa0',
       slug: slug,
       transaction_nsu: transaction_id,
+      external_order_nsu: order_nsu,
     };
 
     const infinitePayResponse = await fetch(infinitePayURL, {

@@ -215,6 +215,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             const slug = urlParams.get('slug');
             const transaction_id = urlParams.get('transaction_id');
+            const order_nsu = urlParams.get('order_nsu');
 
             if (!slug || !transaction_id) {
                 verifyingMessage.style.display = 'none';
@@ -228,7 +229,7 @@
                 const response = await fetch('/api/verificar-pagamento', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ slug, transaction_id }),
+                    body: JSON.stringify({ slug, transaction_id, order_nsu }),
                 });
 
                 if (response.ok) {
