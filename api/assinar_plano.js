@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 // Configure o cliente Supabase.
 // É ALTAMENTE RECOMENDÁVEL usar variáveis de ambiente (Environment Variables) na Vercel.
 const supabaseUrl = process.env.SUPABASE_URL || 'https://ibbfrktduvhslbfwsnor.supabase.co';
-const supabaseKey = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImliYmZya3RkdXZoc2xiZndzbm9yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIzNjU3MjgsImV4cCI6MjA2Nzk0MTcyOH0.yKR8PlYGATiLR0neN75jFO76VL6wrROi98IIrAEN1wM'; // Use a chave 'service_role' no backend
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || 'MINHA_CHAVE_SECRETA'; // Use a chave 'service_role' no backend
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
