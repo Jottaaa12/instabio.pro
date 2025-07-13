@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Falta Pouco!</title>
-    <!-- Adiciona o cliente Supabase via CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary-color: #1DB954;
@@ -125,38 +123,82 @@
 <body>
 
     <div class="container">
-        <h1>Falta pouco!</h1>
-        <p>Pagamento aprovado! Preencha os dados abaixo para receber o convite do Spotify Premium.</p>
+        <div id="verifying-message">
+            <h1>Verificando pagamento...</h1>
+            <p>Por favor, aguarde um momento.</p>
+        </div>
 
-        <form id="confirm-form">
-            <div>
-                <label for="full-name">Nome Completo</label>
-                <input type="text" id="full-name" name="full-name" placeholder="Seu nome completo" required>
-            </div>
-
-            <div>
-                <label for="email">E-mail (da sua conta Spotify)</label>
-                <input type="email" id="email" name="email" placeholder="email@exemplo.com" required>
-            </div>
-
-            <div>
-                <label for="phone">Telefone / WhatsApp</label>
-                <input type="tel" id="phone" name="phone" placeholder="(XX) XXXXX-XXXX" required>
-            </div>
-
-            <button type="submit" class="submit-btn">Finalizar e Receber Acesso</button>
-        </form>
+        <div id="confirmation-content" style="display: none;">
+            <h1>Falta pouco!</h1>
+            <p>Pagamento aprovado! Preencha os dados abaixo para receber o convite do Spotify Premium.</p>
+            <form id="confirm-form">
+                <div>
+                    <label for="full-name">Nome Completo</label>
+                    <input type="text" id="full-name" name="full-name" placeholder="Seu nome completo" required>
+                </div>
+                <div>
+                    <label for="email">E-mail (da sua conta Spotify)</label>
+                    <input type="email" id="email" name="email" placeholder="email@exemplo.com" required>
+                </div>
+                <div>
+                    <label for="phone">Telefone / WhatsApp</label>
+                    <input type="tel" id="phone" name="phone" placeholder="(XX) XXXXX-XXXX" required>
+                </div>
+                <button type="submit" class="submit-btn">Finalizar e Receber Acesso</button>
+            </form>
+        </div>
 
         <div id="status-message"></div>
-
     </div>
 
     <script>
-        const form = document.getElementById('confirm-form');
+        // Elementos da UI
+        const verifyingMessage = document.getElementById('verifying-message');
+        const confirmationContent = document.getElementById('confirmation-content');
         const statusMessage = document.getElementById('status-message');
+        const form = document.getElementById('confirm-form');
         const submitButton = form.querySelector('.submit-btn');
-        const container = document.querySelector('.container');
 
+        // 1. Lógica de verificação de pagamento ao carregar a página
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const slug = urlParams.get('slug');
+            const transaction_id = urlParams.get('transaction_id');
+
+            if (!slug || !transaction_id) {
+                verifyingMessage.style.display = 'none';
+                statusMessage.textContent = 'Erro: Parâmetros de transação inválidos na URL.';
+                statusMessage.className = 'error';
+                statusMessage.style.display = 'block';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/verificar-pagamento', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ slug, transaction_id }),
+                });
+
+                if (response.ok) {
+                    verifyingMessage.style.display = 'none';
+                    confirmationContent.style.display = 'block';
+                } else {
+                    const result = await response.json();
+                    verifyingMessage.style.display = 'none';
+                    statusMessage.textContent = result.message || 'Pagamento não foi confirmado. Se você já pagou, entre em contato com o suporte.';
+                    statusMessage.className = 'error';
+                    statusMessage.style.display = 'block';
+                }
+            } catch (error) {
+                verifyingMessage.style.display = 'none';
+                statusMessage.textContent = 'Erro de conexão. Não foi possível verificar seu pagamento no momento.';
+                statusMessage.className = 'error';
+                statusMessage.style.display = 'block';
+            }
+        });
+
+        // 2. Lógica de submissão do formulário de confirmação
         form.addEventListener('submit', async (event) => {
             event.preventDefault();
             submitButton.disabled = true;
@@ -180,28 +222,22 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    // Esconde o formulário e o parágrafo inicial
-                    form.style.display = 'none';
-                    container.querySelector('p').style.display = 'none';
-
-                    // Exibe a mensagem de sucesso
+                    confirmationContent.style.display = 'none';
                     statusMessage.innerHTML = `
                         <strong>Tudo certo!</strong><br>
-                        Seu convite para o Spotify Premium foi enviado.<br>
-                        Acesse pelo link: <a href="${result.link_spotify}" target="_blank" style="color: white;">${result.link_spotify}</a>
+                        Seu convite para o Spotify Premium foi enviado para seu e-mail.<br>
+                        Se precisar, o link é: <a href="${result.link_spotify}" target="_blank" style="color: white;">Acessar Convite</a>
                     `;
                     statusMessage.className = 'success';
                     statusMessage.style.display = 'block';
                 } else {
-                    // Exibe a mensagem de erro
-                    statusMessage.textContent = result.message || 'Ocorreu um erro. Tente novamente.';
+                    statusMessage.textContent = result.message || 'Ocorreu um erro ao enviar seus dados. Tente novamente.';
                     statusMessage.className = 'error';
                     statusMessage.style.display = 'block';
                     submitButton.disabled = false;
                     submitButton.textContent = 'Finalizar e Receber Acesso';
                 }
             } catch (error) {
-                // Exibe a mensagem de erro de rede
                 statusMessage.textContent = 'Erro de conexão. Verifique sua internet e tente novamente.';
                 statusMessage.className = 'error';
                 statusMessage.style.display = 'block';
