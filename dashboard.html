@@ -227,8 +227,8 @@
                     ]);
 
                 if (error) {
-                    console.error('Erro ao adicionar plano:', error);
-                    alert('Ocorreu um erro ao adicionar o plano.');
+                    console.error('Erro detalhado do Supabase:', error);
+                    alert('Ocorreu um erro ao adicionar o plano. Verifique o console para mais detalhes.');
                 } else {
                     console.log('Plano adicionado com sucesso:', data);
                     // Limpa o formulário
