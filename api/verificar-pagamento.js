@@ -1,4 +1,3 @@
-
 export default async function handler(request, response) {
   if (request.method !== 'POST') {
     response.setHeader('Allow', ['POST']);
@@ -12,18 +11,26 @@ export default async function handler(request, response) {
       return response.status(400).json({ error: 'Parâmetros slug ou transaction_id ausentes.' });
     }
 
-    const infinitePayURL = `https://api.infinitepay.io/invoices/public/checkout/payment_check/jottaaa0/${slug}/${transaction_id}`;
+    const infinitePayURL = 'https://api.infinitepay.io/invoices/public/checkout/payment_check/jottaaa0';
+
+    const requestBody = {
+      handle: 'jottaaa0',
+      slug: slug,
+      transaction_nsu: transaction_id,
+    };
 
     const infinitePayResponse = await fetch(infinitePayURL, {
-        method: 'GET',
-        headers: {
-            'Accept': 'application/json'
-        }
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
     });
 
     if (!infinitePayResponse.ok) {
-        console.error('Erro na API da InfinitePay:', await infinitePayResponse.text());
-        return response.status(402).json({ message: 'Falha ao verificar o pagamento com o provedor.' });
+      console.error('Erro na API da InfinitePay:', await infinitePayResponse.text());
+      return response.status(402).json({ message: 'Falha ao verificar o pagamento com o provedor.' });
     }
 
     const paymentData = await infinitePayResponse.json();
