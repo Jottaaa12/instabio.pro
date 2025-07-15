@@ -5,7 +5,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req, res) {
-  if (req.method == 'POST') {
+  if (req.method.toUpperCase() !== 'POST') {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
