@@ -15,6 +15,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Swiper.js CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css" />
     
     <style>
         body {
@@ -46,81 +49,201 @@
             70% { box-shadow: 0 0 0 10px rgba(34, 197, 94, 0); }
             100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
         }
+
+        /* Swiper Custom Styles */
+        .swiper-container {
+            width: 100%;
+            padding-top: 20px;
+            padding-bottom: 50px;
+        }
+        .swiper-slide {
+            background-position: center;
+            background-size: cover;
+            width: 280px;
+            height: 360px;
+            border-radius: 1rem;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.5s ease, box-shadow 0.5s ease;
+        }
+        .swiper-slide:hover {
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.15);
+        }
+        .swiper-button-next, .swiper-button-prev {
+            color: #c7d2fe; /* Cor das setas */
+            transform: scale(0.8);
+        }
+        .swiper-button-next:hover, .swiper-button-prev:hover {
+            color: #fff;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 100; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.6);
+            -webkit-backdrop-filter: blur(5px);
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-content {
+            background-color: #111827; /* Dark background */
+            color: #e5e7eb;
+            margin: 5% auto;
+            padding: 1.5rem 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1rem;
+            width: 90%;
+            max-width: 600px;
+            position: relative;
+            animation: slideDown 0.5s ease-out;
+        }
+        @keyframes slideDown { from { transform: translateY(-30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .close-button {
+            color: #9ca3af;
+            position: absolute;
+            top: 0.5rem;
+            right: 1rem;
+            font-size: 2rem;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+        .close-button:hover, .close-button:focus {
+            color: #fff;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .form-input, .form-textarea, .form-select {
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            width: 100%;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .form-input:focus, .form-textarea:focus, .form-select:focus {
+            outline: none;
+            border-color: #8b5cf6;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.4);
+        }
+        .form-label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #d1d5db; }
+        .form-group { margin-bottom: 1.5rem; }
     </style>
 </head>
-<body class="bg-slate-900 animated-gradient">
+<body class="bg-slate-900 animated-gradient overflow-x-hidden">
 
     <div class="container mx-auto flex flex-col items-center justify-center min-h-screen p-4 text-center">
         
-        <div class="bg-gray-900/30 backdrop-blur-xl p-6 md:p-8 rounded-2xl border border-white/10 shadow-2xl w-full max-w-md card-enter">
+        <div class="bg-gray-900/30 backdrop-blur-xl p-6 md:p-8 rounded-2xl border border-white/10 shadow-2xl w-full max-w-lg card-enter">
             
             <!-- SEU PERFIL -->
-            <img 
-                src="logo" 
-                alt="Logo de Jotta" 
-                class="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-purple-400/50 shadow-lg"
-            >
+            <img src="logo" alt="Logo de Jotta" class="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-purple-400/50 shadow-lg">
             <h1 class="text-2xl md:text-3xl font-extrabold text-white mb-1">Jotta</h1>
             <p class="text-purple-300 font-semibold mb-2">Especialista em Presença Digital</p>
             <p class="text-white/70 text-sm mb-6 max-w-xs mx-auto">Sua página profissional na bio, sem complicações. Do design à publicação com domínio próprio, eu cuido de tudo.</p>
 
             <!-- CALL TO ACTION PRINCIPAL -->
-            <div class="flex flex-col space-y-4 w-full mb-8">
-                <a href="https://wa.me/5588981905006" target="_blank" class="bg-green-500 text-white font-bold py-3 px-6 rounded-lg w-full flex items-center justify-center transition-all duration-300 hover:bg-green-400 hover:scale-105 shadow-lg hover:shadow-green-400/20 pulse-effect">
-                    <i class="fa-brands fa-whatsapp mr-3 text-xl"></i>
-                    <span>Solicitar Orçamento Rápido</span>
-                </a>
+            <div class="flex flex-col space-y-4 w-full mb-8 max-w-sm mx-auto">
+                <button id="openModalBtn" class="bg-green-500 text-white font-bold py-3 px-6 rounded-lg w-full flex items-center justify-center transition-all duration-300 hover:bg-green-400 hover:scale-105 shadow-lg hover:shadow-green-400/20 pulse-effect">
+                    <i class="fa-solid fa-rocket mr-3"></i>
+                    <span>Quero Minha Página Profissional</span>
+                </button>
             </div>
             
-            <!-- PROVA SOCIAL - SEUS PROJETOS -->
-            <div class="bg-black/20 p-4 rounded-lg border border-white/10 text-left">
-                <p class="text-white/60 text-xs font-semibold mb-2 uppercase tracking-wider">Veja Exemplos do Meu Trabalho</p>
-                
-                <!-- Exemplo 1: Comércio Local -->
-                <a href="https://acaisabordaterra.com.br" target="_blank" class="flex items-center justify-between bg-white/5 p-3 rounded-md hover:bg-white/10 transition-colors">
-                    <div class="flex items-center">
-                        <div class="w-10 h-10 rounded-full bg-purple-800 flex items-center justify-center mr-3">
-                           <i class="fa-solid fa-store text-white"></i>
+            <!-- PROVA SOCIAL - CARROSSEL DE PROJETOS -->
+            <div class="w-full text-center mb-12">
+                <p class="text-white/60 text-sm font-semibold mb-4 uppercase tracking-wider">Explore meu Portfólio</p>
+                <div class="swiper-container mySwiper">
+                    <div class="swiper-wrapper">
+                        <!-- Slide 1: Açaí Sabor da Terra -->
+                        <div class="swiper-slide flex flex-col justify-between p-6 text-white" style="background: linear-gradient(to top, #4a1d96, #8e2de2);">
+                            <div class="text-left">
+                                <i class="fa-solid fa-store text-4xl mb-3 opacity-50"></i>
+                                <h3 class="font-bold text-xl">Açaí Sabor da Terra</h3>
+                                <p class="text-sm opacity-80"><b>Foco:</b> Aumentar pedidos online e visibilidade local.</p>
+                            </div>
+                            <a href="https://acaisabordaterra.com.br" target="_blank" class="bg-white/20 backdrop-blur-lg text-white font-semibold py-2 px-4 rounded-lg w-full text-center transition-all duration-300 hover:bg-white/30">Ver Projeto</a>
                         </div>
-                        <div>
-                            <p class="font-semibold text-white">Link na Bio (Comércio)</p>
-                            <p class="text-xs text-purple-300">acaisabordaterra.com.br</p>
+                        <!-- Slide 2: DJ Luna -->
+                        <div class="swiper-slide flex flex-col justify-between p-6 text-white" style="background: linear-gradient(to top, #0f0c29, #302b63, #24243e);">
+                            <div class="text-left">
+                                <i class="fa-solid fa-headphones text-4xl mb-3 opacity-50"></i>
+                                <h3 class="font-bold text-xl">DJ Luna</h3>
+                                <p class="text-sm opacity-80"><b>Destaque:</b> Design neon e pulsante para engajar o público.</p>
+                            </div>
+                            <a href="djluna/index.html" target="_blank" class="bg-white/20 backdrop-blur-lg text-white font-semibold py-2 px-4 rounded-lg w-full text-center transition-all duration-300 hover:bg-white/30">Ver Demo</a>
+                        </div>
+                        <!-- Slide 3: Doce Ateliê -->
+                        <div class="swiper-slide flex flex-col justify-between p-6 text-gray-800" style="background: linear-gradient(to top, #fbc2eb, #a6c1ee);">
+                            <div class="text-left">
+                                <i class="fa-solid fa-cake-candles text-4xl mb-3 opacity-50"></i>
+                                <h3 class="font-bold text-xl">Doce Ateliê</h3>
+                                <p class="text-sm opacity-80"><b>Resultado:</b> Imagem profissional que atraiu +30% de encomendas.</p>
+                            </div>
+                            <a href="doceatelie/index.html" target="_blank" class="bg-black/10 backdrop-blur-lg text-gray-800 font-semibold py-2 px-4 rounded-lg w-full text-center transition-all duration-300 hover:bg-black/20">Ver Demo</a>
+                        </div>
+                        <!-- Slide 4: Lucas Alves -->
+                        <div class="swiper-slide flex flex-col justify-between p-6 text-white" style="background: linear-gradient(to top, #00416a, #799f0c, #e4e5e6);">
+                            <div class="text-left">
+                                <i class="fa-solid fa-user-tie text-4xl mb-3 opacity-50"></i>
+                                <h3 class="font-bold text-xl">Lucas Alves</h3>
+                                <p class="text-sm opacity-80"><b>Objetivo:</b> Transmitir autoridade e confiança no mercado.</p>
+                            </div>
+                            <a href="lucasAlves/index.html" target="_blank" class="bg-white/20 backdrop-blur-lg text-white font-semibold py-2 px-4 rounded-lg w-full text-center transition-all duration-300 hover:bg-white/30">Ver Demo</a>
+                        </div>
+                        <!-- Slide 5: Personal Trainer -->
+                        <div class="swiper-slide flex flex-col justify-between p-6 text-white" style="background: linear-gradient(to top, #141e30, #243b55);">
+                            <div class="text-left">
+                                <i class="fa-solid fa-dumbbell text-4xl mb-3 opacity-50"></i>
+                                <h3 class="font-bold text-xl">Personal Trainer</h3>
+                                <p class="text-sm opacity-80"><b>Estratégia:</b> Foco em conversão para agendamentos de planos.</p>
+                            </div>
+                            <a href="personaltrainer/index.html" target="_blank" class="bg-white/20 backdrop-blur-lg text-white font-semibold py-2 px-4 rounded-lg w-full text-center transition-all duration-300 hover:bg-white/30">Ver Demo</a>
                         </div>
                     </div>
-                    <i class="fa-solid fa-arrow-up-right-from-square text-white/50"></i>
-                </a>
+                    <div class="swiper-pagination"></div>
+                    <div class="swiper-button-next"></div>
+                    <div class="swiper-button-prev"></div>
+                </div>
+            </div>
 
-                <!-- Exemplo 2: Vitrine Profissional (Lucas Alves) -->
-                <a href="lucasAlves/index.html" target="_blank" class="mt-2 flex items-center justify-between bg-white/5 p-3 rounded-md hover:bg-white/10 transition-colors">
-                    <div class="flex items-center">
-                        <div class="w-10 h-10 rounded-full bg-purple-800 flex items-center justify-center mr-3">
-                           <i class="fa-solid fa-user-tie text-white"></i>
-                        </div>
-                        <div>
-                            <p class="font-semibold text-white">Vitrine (Profissional)</p>
-                            <p class="text-xs text-purple-300">Clique para ver o demo</p>
-                        </div>
+            <!-- COMO FUNCIONA -->
+            <div class="mb-12">
+                <p class="text-white/60 text-sm font-semibold mb-4 uppercase tracking-wider">Do Briefing ao Lançamento</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-white/90 text-sm">
+                    <div class="bg-black/20 p-4 rounded-lg text-center border border-white/10">
+                        <i class="fa-solid fa-pen-to-square text-2xl mb-2 text-purple-300"></i>
+                        <h4 class="font-bold">1. Briefing</h4>
+                        <p class="text-xs text-white/60">Você preenche o formulário e nós entendemos sua visão.</p>
                     </div>
-                    <i class="fa-solid fa-arrow-up-right-from-square text-white/50"></i>
-                </a>
+                    <div class="bg-black/20 p-4 rounded-lg text-center border border-white/10">
+                        <i class="fa-solid fa-magic-wand-sparkles text-2xl mb-2 text-purple-300"></i>
+                        <h4 class="font-bold">2. Criação</h4>
+                        <p class="text-xs text-white/60">Eu desenho e desenvolvo uma página única para sua marca.</p>
+                    </div>
+                    <div class="bg-black/20 p-4 rounded-lg text-center border border-white/10">
+                        <i class="fa-solid fa-rocket text-2xl mb-2 text-purple-300"></i>
+                        <h4 class="font-bold">3. Lançamento</h4>
+                        <p class="text-xs text-white/60">Sua página no ar, com domínio próprio e alta velocidade.</p>
+                    </div>
+                </div>
             </div>
 
             <!-- BENEFÍCIOS DO SEU SERVIÇO -->
-            <div class="mt-8">
+            <div>
                  <p class="text-white/60 text-xs font-semibold mb-4 uppercase tracking-wider">O que está incluso</p>
                  <div class="grid grid-cols-3 gap-4 text-white/80 text-xs">
-                     <div class="bg-black/20 p-2 rounded-md">
-                         <i class="fa-solid fa-palette mb-1 text-purple-300"></i>
-                         <p>Design Exclusivo</p>
-                     </div>
-                     <div class="bg-black/20 p-2 rounded-md">
-                         <i class="fa-solid fa-globe mb-1 text-purple-300"></i>
-                         <p>Domínio Próprio</p>
-                     </div>
-                     <div class="bg-black/20 p-2 rounded-md">
-                         <i class="fa-solid fa-bolt mb-1 text-purple-300"></i>
-                         <p>Alta Velocidade</p>
-                     </div>
+                     <div class="bg-black/20 p-2 rounded-md"><i class="fa-solid fa-palette mb-1 text-purple-300"></i><p>Design Exclusivo</p></div>
+                     <div class="bg-black/20 p-2 rounded-md"><i class="fa-solid fa-globe mb-1 text-purple-300"></i><p>Domínio Próprio</p></div>
+                     <div class="bg-black/20 p-2 rounded-md"><i class="fa-solid fa-bolt mb-1 text-purple-300"></i><p>Alta Velocidade</p></div>
                  </div>
             </div>
 
@@ -139,6 +262,142 @@
         </footer>
 
     </div>
+
+    <!-- Briefing Modal -->
+    <div id="briefingModal" class="modal">
+        <div class="modal-content">
+            <span id="closeModalBtn" class="close-button">&times;</span>
+            <h2 class="text-2xl font-bold text-white mb-2 text-center">✨ Formulário de Briefing ✨</h2>
+            <p class="text-center text-purple-300 mb-6 text-sm">Para deixar seu site com a cara da sua marca, preencha os campos abaixo.</p>
+            
+            <form id="briefingForm" class="text-left">
+                <div class="form-group">
+                    <label for="nomeMarca" class="form-label">1. 🏷️ Nome da Marca</label>
+                    <input type="text" id="nomeMarca" class="form-input" placeholder="Qual nome deve aparecer em destaque?" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="logoIdeia" class="form-label">2. 🖼️ Sua Logo ou Imagem Principal</label>
+                    <textarea id="logoIdeia" class="form-textarea" rows="2" placeholder="Descreva sua ideia para a logo ou cole um link de referência."></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-group">
+                        <label for="cores" class="form-label">3. 🎨 Cores Principais</label>
+                        <input type="text" id="cores" class="form-input" placeholder="Ex: Roxo, branco e bege">
+                    </div>
+                    <div class="form-group">
+                        <label for="estilo" class="form-label">4. ✨ Estilo Visual</label>
+                        <select id="estilo" class="form-select">
+                            <option>Moderno e minimalista</option>
+                            <option>Divertido e colorido</option>
+                            <option>Elegante e sofisticado</option>
+                            <option>Vibrante e neon</option>
+                            <option>Outro</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">5. 🔗 Seus Links Principais</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="link1_texto" class="form-input" placeholder="Texto do Botão 1">
+                        <input type="url" id="link1_url" class="form-input" placeholder="URL do Link 1">
+                        <input type="text" id="link2_texto" class="form-input mt-2" placeholder="Texto do Botão 2">
+                        <input type="url" id="link2_url" class="form-input mt-2" placeholder="URL do Link 2">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="linkPersonalizado" class="form-label">6. 🌐 Seu Link Personalizado</label>
+                    <div class="flex items-center">
+                        <span class="text-gray-400 mr-2">instabio.pro/</span>
+                        <input type="text" id="linkPersonalizado" class="form-input" placeholder="seunome">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center transition-all duration-300 hover:bg-green-400 hover:scale-105 shadow-lg">
+                    <i class="fa-brands fa-whatsapp mr-3"></i>
+                    Enviar Briefing via WhatsApp
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Swiper.js JS -->
+    <script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>
+
+    <!-- Initialize Swiper -->
+    <script>
+        var swiper = new Swiper(".mySwiper", {
+            effect: "coverflow",
+            grabCursor: true,
+            centeredSlides: true,
+            slidesPerView: "auto",
+            coverflowEffect: {
+                rotate: 50,
+                stretch: 0,
+                depth: 100,
+                modifier: 1,
+                slideShadows: true,
+            },
+            pagination: { el: ".swiper-pagination" },
+            navigation: { nextEl: ".swiper-button-next", prevEl: ".swiper-button-prev" },
+        });
+    </script>
+
+    <!-- Modal and Form Script -->
+    <script>
+        const modal = document.getElementById("briefingModal");
+        const openBtn = document.getElementById("openModalBtn");
+        const closeBtn = document.getElementById("closeModalBtn");
+        const briefingForm = document.getElementById("briefingForm");
+
+        openBtn.onclick = () => { modal.style.display = "block"; };
+        closeBtn.onclick = () => { modal.style.display = "none"; };
+        window.onclick = (event) => {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        };
+
+        briefingForm.onsubmit = (event) => {
+            event.preventDefault();
+            
+            const nomeMarca = document.getElementById('nomeMarca').value;
+            const logoIdeia = document.getElementById('logoIdeia').value;
+            const cores = document.getElementById('cores').value;
+            const estilo = document.getElementById('estilo').value;
+            const link1_texto = document.getElementById('link1_texto').value;
+            const link1_url = document.getElementById('link1_url').value;
+            const link2_texto = document.getElementById('link2_texto').value;
+            const link2_url = document.getElementById('link2_url').value;
+            const linkPersonalizado = document.getElementById('linkPersonalizado').value;
+
+            let message = `✨ *Novo Briefing Recebido* ✨\n\n`;
+            message += `*1. 🏷️ Nome da Marca:*
+${nomeMarca}\n\n`;
+            message += `*2. 🖼️ Logo/Imagem:*
+${logoIdeia || 'Nenhuma descrição fornecida.'}\n\n`;
+            message += `*3. 🎨 Cores Principais:*
+${cores || 'Nenhuma cor fornecida.'}\n\n`;
+            message += `*4. ✨ Estilo Visual:*
+${estilo}\n\n`;
+            message += `*5. 🔗 Links Principais:*
+`;
+            if(link1_texto && link1_url) message += `- Botão 1: ${link1_texto} -> ${link1_url}\n`;
+            if(link2_texto && link2_url) message += `- Botão 2: ${link2_texto} -> ${link2_url}\n`;
+            if(!link1_texto && !link2_texto) message += `Nenhum link fornecido.\n`;
+            message += `\n`;
+            message += `*6. 🌐 Link Personalizado:*
+instabio.pro/${linkPersonalizado || 'Não preenchido.'}`;
+
+            const whatsappUrl = `https://wa.me/5588981905006?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+
+            modal.style.display = "none";
+        };
+    </script>
 
 </body>
 </html>
