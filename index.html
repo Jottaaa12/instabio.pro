@@ -148,7 +148,7 @@
             <img src="logo" alt="Logo de Jotta" class="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-purple-400/50 shadow-lg">
             <h1 class="text-2xl md:text-3xl font-extrabold text-white mb-1">Jotta</h1>
             <p class="text-purple-300 font-semibold mb-2">Especialista em Presença Digital</p>
-            <p class="text-white/70 text-sm mb-6 max-w-xs mx-auto">Sua página profissional na bio, sem complicações. Do design à publicação com domínio próprio, eu cuido de tudo.</p>
+            <p class="text-white/70 text-sm mb-6 max-w-xs mx-auto">Crio sua página de links profissional, do design ao domínio. Destaque-se na bio.</p>
 
             <!-- CALL TO ACTION PRINCIPAL -->
             <div class="flex flex-col space-y-4 w-full mb-8 max-w-sm mx-auto">
@@ -161,7 +161,7 @@
             <!-- PROVA SOCIAL - CARROSSEL DE PROJETOS -->
             <div class="w-full text-center mb-12">
                 <p class="text-white/60 text-sm font-semibold mb-4 uppercase tracking-wider">Explore meu Portfólio</p>
-                <div class="swiper-container mySwiper">
+                <div class="swiper-container mySwiper overflow-hidden">
                     <div class="swiper-wrapper">
                         <!-- Slide 1: Açaí Sabor da Terra -->
                         <div class="swiper-slide flex flex-col justify-between p-6 text-white" style="background: linear-gradient(to top, #4a1d96, #8e2de2);">
@@ -219,17 +219,17 @@
             <div class="mb-12">
                 <p class="text-white/60 text-sm font-semibold mb-4 uppercase tracking-wider">Do Briefing ao Lançamento</p>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-white/90 text-sm">
-                    <div class="bg-black/20 p-4 rounded-lg text-center border border-white/10">
+                    <div class="bg-black/20 p-4 rounded-lg text-center border border-white/10 transition-all duration-300 hover:bg-black/40 hover:border-white/20">
                         <i class="fa-solid fa-pen-to-square text-2xl mb-2 text-purple-300"></i>
                         <h4 class="font-bold">1. Briefing</h4>
                         <p class="text-xs text-white/60">Você preenche o formulário e nós entendemos sua visão.</p>
                     </div>
-                    <div class="bg-black/20 p-4 rounded-lg text-center border border-white/10">
+                    <div class="bg-black/20 p-4 rounded-lg text-center border border-white/10 transition-all duration-300 hover:bg-black/40 hover:border-white/20">
                         <i class="fa-solid fa-magic-wand-sparkles text-2xl mb-2 text-purple-300"></i>
                         <h4 class="font-bold">2. Criação</h4>
                         <p class="text-xs text-white/60">Eu desenho e desenvolvo uma página única para sua marca.</p>
                     </div>
-                    <div class="bg-black/20 p-4 rounded-lg text-center border border-white/10">
+                    <div class="bg-black/20 p-4 rounded-lg text-center border border-white/10 transition-all duration-300 hover:bg-black/40 hover:border-white/20">
                         <i class="fa-solid fa-rocket text-2xl mb-2 text-purple-300"></i>
                         <h4 class="font-bold">3. Lançamento</h4>
                         <p class="text-xs text-white/60">Sua página no ar, com domínio próprio e alta velocidade.</p>
@@ -270,25 +270,25 @@
             <h2 class="text-2xl font-bold text-white mb-2 text-center">✨ Formulário de Briefing ✨</h2>
             <p class="text-center text-purple-300 mb-6 text-sm">Para deixar seu site com a cara da sua marca, preencha os campos abaixo.</p>
             
-            <form id="briefingForm" class="text-left">
+            <form action="https://formspree.io/f/mqalrkyo" method="POST" class="text-left">
                 <div class="form-group">
                     <label for="nomeMarca" class="form-label">1. 🏷️ Nome da Marca</label>
-                    <input type="text" id="nomeMarca" class="form-input" placeholder="Qual nome deve aparecer em destaque?" required>
+                    <input type="text" id="nomeMarca" name="Nome da Marca" class="form-input" placeholder="Qual nome deve aparecer em destaque?" required>
                 </div>
 
                 <div class="form-group">
                     <label for="logoIdeia" class="form-label">2. 🖼️ Sua Logo ou Imagem Principal</label>
-                    <textarea id="logoIdeia" class="form-textarea" rows="2" placeholder="Descreva sua ideia para a logo ou cole um link de referência."></textarea>
+                    <textarea id="logoIdeia" name="Ideia de Logo" class="form-textarea" rows="2" placeholder="Descreva sua ideia para a logo ou cole um link de referência."></textarea>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="form-group">
                         <label for="cores" class="form-label">3. 🎨 Cores Principais</label>
-                        <input type="text" id="cores" class="form-input" placeholder="Ex: Roxo, branco e bege">
+                        <input type="text" id="cores" name="Cores" class="form-input" placeholder="Ex: Roxo, branco e bege">
                     </div>
                     <div class="form-group">
                         <label for="estilo" class="form-label">4. ✨ Estilo Visual</label>
-                        <select id="estilo" class="form-select">
+                        <select id="estilo" name="Estilo Visual" class="form-select">
                             <option>Moderno e minimalista</option>
                             <option>Divertido e colorido</option>
                             <option>Elegante e sofisticado</option>
@@ -301,10 +301,10 @@
                 <div class="form-group">
                     <label class="form-label">5. 🔗 Seus Links Principais</label>
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="text" id="link1_texto" class="form-input" placeholder="Texto do Botão 1">
-                        <input type="url" id="link1_url" class="form-input" placeholder="URL do Link 1">
-                        <input type="text" id="link2_texto" class="form-input mt-2" placeholder="Texto do Botão 2">
-                        <input type="url" id="link2_url" class="form-input mt-2" placeholder="URL do Link 2">
+                        <input type="text" id="link1_texto" name="Botão 1 - Texto" class="form-input" placeholder="Texto do Botão 1">
+                        <input type="url" id="link1_url" name="Botão 1 - URL" class="form-input" placeholder="URL do Link 1">
+                        <input type="text" id="link2_texto" name="Botão 2 - Texto" class="form-input mt-2" placeholder="Texto do Botão 2">
+                        <input type="url" id="link2_url" name="Botão 2 - URL" class="form-input mt-2" placeholder="URL do Link 2">
                     </div>
                 </div>
 
@@ -312,13 +312,13 @@
                     <label for="linkPersonalizado" class="form-label">6. 🌐 Seu Link Personalizado</label>
                     <div class="flex items-center">
                         <span class="text-gray-400 mr-2">instabio.pro/</span>
-                        <input type="text" id="linkPersonalizado" class="form-input" placeholder="seunome">
+                        <input type="text" id="linkPersonalizado" name="Link Personalizado" class="form-input" placeholder="seunome">
                     </div>
                 </div>
 
                 <button type="submit" class="w-full bg-green-500 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center transition-all duration-300 hover:bg-green-400 hover:scale-105 shadow-lg">
-                    <i class="fa-brands fa-whatsapp mr-3"></i>
-                    Enviar Briefing via WhatsApp
+                    <i class="fa-solid fa-paper-plane mr-3"></i>
+                    Enviar Briefing
                 </button>
             </form>
         </div>
@@ -351,7 +351,6 @@
         const modal = document.getElementById("briefingModal");
         const openBtn = document.getElementById("openModalBtn");
         const closeBtn = document.getElementById("closeModalBtn");
-        const briefingForm = document.getElementById("briefingForm");
 
         openBtn.onclick = () => { modal.style.display = "block"; };
         closeBtn.onclick = () => { modal.style.display = "none"; };
@@ -360,43 +359,24 @@
                 modal.style.display = "none";
             }
         };
+    </script>
 
-        briefingForm.onsubmit = (event) => {
-            event.preventDefault();
-            
-            const nomeMarca = document.getElementById('nomeMarca').value;
-            const logoIdeia = document.getElementById('logoIdeia').value;
-            const cores = document.getElementById('cores').value;
-            const estilo = document.getElementById('estilo').value;
-            const link1_texto = document.getElementById('link1_texto').value;
-            const link1_url = document.getElementById('link1_url').value;
-            const link2_texto = document.getElementById('link2_texto').value;
-            const link2_url = document.getElementById('link2_url').value;
-            const linkPersonalizado = document.getElementById('linkPersonalizado').value;
-
-            let message = `✨ *Novo Briefing Recebido* ✨\n\n`;
-            message += `*1. 🏷️ Nome da Marca:*
-${nomeMarca}\n\n`;
-            message += `*2. 🖼️ Logo/Imagem:*
-${logoIdeia || 'Nenhuma descrição fornecida.'}\n\n`;
-            message += `*3. 🎨 Cores Principais:*
-${cores || 'Nenhuma cor fornecida.'}\n\n`;
-            message += `*4. ✨ Estilo Visual:*
-${estilo}\n\n`;
-            message += `*5. 🔗 Links Principais:*
-`;
-            if(link1_texto && link1_url) message += `- Botão 1: ${link1_texto} -> ${link1_url}\n`;
-            if(link2_texto && link2_url) message += `- Botão 2: ${link2_texto} -> ${link2_url}\n`;
-            if(!link1_texto && !link2_texto) message += `Nenhum link fornecido.\n`;
-            message += `\n`;
-            message += `*6. 🌐 Link Personalizado:*
-instabio.pro/${linkPersonalizado || 'Não preenchido.'}`;
-
-            const whatsappUrl = `https://wa.me/5588981905006?text=${encodeURIComponent(message)}`;
-            window.open(whatsappUrl, '_blank');
-
-            modal.style.display = "none";
-        };
+    <!-- Script for clickable cards -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.swiper-slide').forEach(slide => {
+                const link = slide.querySelector('a');
+                if (link) {
+                    slide.style.cursor = 'pointer';
+                    slide.addEventListener('click', (event) => {
+                        if (event.target.tagName === 'A' || event.target.closest('a')) {
+                            return;
+                        }
+                        window.open(link.href, link.target);
+                    });
+                }
+            });
+        });
     </script>
 
 </body>
