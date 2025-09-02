@@ -1,0 +1,328 @@
+/* Define a CSS variable for the --opacity property */
+@property --opacity {
+    syntax: '<number>';
+    inherits: false;
+    initial-value: 0.05;
+}
+
+/* General Body Style */
+body {
+    cursor: none; /* Hide the default cursor */
+}
+
+/* Custom Cursor */
+.custom-cursor {
+    position: fixed;
+    width: 25px;
+    height: 25px;
+    border: 2px solid #FFFFFF;
+    border-radius: 50%;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition: width 0.2s, height 0.2s, background-color 0.2s, border-width 0.2s;
+    z-index: 9999;
+    mix-blend-mode: difference;
+}
+
+.custom-cursor.hovered {
+    width: 50px;
+    height: 50px;
+    background-color: #00a0af;
+    border-width: 0;
+}
+
+/* Header Scroll Effect */
+header.scrolled {
+    background-color: rgba(17, 24, 39, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+header.scrolled nav {
+    padding-top: 0.75rem; /* 12px */
+    padding-bottom: 0.75rem; /* 12px */
+}
+
+header.scrolled img {
+    height: 1.5rem; /* 24px */
+}
+
+/* Navigation Link Styles */
+.nav-link {
+    position: relative;
+    padding-bottom: 4px;
+    transition: color 0.3s;
+}
+
+.nav-text-shadow {
+    text-shadow: 1px 1px 4px rgba(0,0,0,0.5);
+}
+
+.nav-link::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background-color: #00a0af; /* flow-cyan */
+    transition: width 0.3s ease-in-out;
+}
+
+.nav-link:hover::after {
+    width: 100%;
+}
+
+/* Scroll Down Icon Animation */
+.scroll-down-icon {
+    width: 24px;
+    height: 40px;
+    border: 2px solid white;
+    border-radius: 12px;
+    position: relative;
+}
+
+.scroll-down-icon::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 4px;
+    height: 8px;
+    background: white;
+    border-radius: 2px;
+    transform: translateX(-50%);
+    animation: scroll-anim 2s infinite;
+}
+
+@keyframes scroll-anim {
+    0% {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+    100% {
+        transform: translate(-50%, 10px);
+        opacity: 0;
+    }
+}
+
+/* Manifesto Section */
+#manifesto {
+    background-color: #049cac;
+}
+
+.manifesto-phrase {
+    position: relative;
+    padding: 1.5rem;
+    border: 1px solid #E5E7EB; /* gray-200 */
+    border-radius: 0.5rem;
+    background-color: rgba(255, 255, 255, 0.5);
+    text-align: left;
+    font-weight: 500;
+}
+
+.manifesto-phrase::before {
+    content: '“';
+    position: absolute;
+    top: -0.5rem;
+    left: 1rem;
+    font-size: 4rem;
+    font-weight: 700;
+    color: #00a0af; /* flow-cyan */
+    opacity: 0.2;
+    line-height: 1;
+}
+
+#manifesto .bg-contain {
+    transition: opacity 1s ease;
+}
+
+#manifesto:hover .bg-contain {
+    opacity: 0.15; /* Increased visibility on hover */
+}
+
+/* Animation Base Classes */
+.animate-on-scroll {
+    transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+}
+
+.fade-in {
+    opacity: 0;
+}
+
+.fade-in-right {
+    opacity: 0;
+    transform: translateX(-50px);
+}
+
+.fade-in-left {
+    opacity: 0;
+    transform: translateX(50px);
+}
+
+/* Animation Active State */
+.animate-on-scroll.is-visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Typing Cursor for Subtitle */
+#subtitle::after {
+    content: '|';
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+
+/* CTA Button Ripple Effect */
+.ripple-button {
+    position: relative;
+    overflow: hidden;
+    padding: 1rem 2rem;
+    border: 2px solid white;
+    color: white;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.ripple-button:hover {
+    background-color: white;
+    color: #00a0af; /* flow-cyan */
+}
+
+.ripple {
+    position: absolute;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.7);
+    transform: scale(0);
+    animation: ripple-anim 0.6s linear;
+}
+
+@keyframes ripple-anim {
+    to {
+        transform: scale(4);
+        opacity: 0;
+    }
+}
+
+#cta-success-message.show {
+    opacity: 1;
+}
+
+/* Logo Fader Animation */
+.logo-fader {
+    position: relative;
+}
+
+.logo-fader img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transition: opacity 0.5s ease-in-out;
+}
+
+.logo-fader img:last-child {
+    animation: fade-logos 6s infinite;
+}
+
+@keyframes fade-logos {
+    0% { opacity: 0; }
+    40% { opacity: 0; }
+    50% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* Development Banner */
+.dev-banner {
+    background-color: #00a0af;
+    color: white;
+    text-align: center;
+    padding: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.dev-banner a {
+    font-weight: bold;
+}
+
+/* Pop-up Banner */
+.popup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: none; /* Hidden by default */
+    justify-content: center;
+    align-items: center;
+    z-index: 10001;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.popup-overlay.show {
+    display: flex;
+    opacity: 1;
+}
+
+.popup-content {
+    background-color: white;
+    padding: 2rem;
+    border-radius: 0.5rem;
+    text-align: center;
+    max-width: 90%;
+    width: 400px;
+    position: relative;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.popup-overlay.show .popup-content {
+    transform: scale(1);
+}
+
+.popup-content h2 {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    color: #111827; /* flow-dark */
+}
+
+.popup-content p {
+    margin-bottom: 1.5rem;
+    color: #374151; /* gray-700 */
+}
+
+.close-button {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 1.5rem;
+    color: #9CA3AF; /* gray-400 */
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.popup-button {
+    display: inline-block;
+    background-color: #00a0af; /* flow-cyan */
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.25rem;
+    text-decoration: none;
+    font-weight: bold;
+    transition: background-color 0.3s;
+}
+
+.popup-button:hover {
+    background-color: #008a99;
+}
